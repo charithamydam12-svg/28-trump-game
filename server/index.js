@@ -139,6 +139,7 @@ io.on('connection', (socket) => {
     const isHost = room.hostId === socket.id;
     console.log(`✅ Rejoined: ${player.name} (${oldId} → ${socket.id}) host=${isHost}`);
     callback({ success: true, playerId: socket.id, persistentId, roomId, isHost, playerName: player.name });
+    io.to(roomId).emit('player_reconnected', { playerName: player.name });
     emitLobby(roomId);
     emitGameState(roomId);
   });
@@ -312,6 +313,43 @@ io.on('connection', (socket) => {
   });
 
   // ── NEXT ROUND ────────────────────────────────
+  socket.on('end_game', (_, callback) => {
+    const roomId = playerRooms.get(socket.id);
+    const room = getRoom(roomId);
+    if (!room) return callback?.({ error: 'Not in a room' });
+    if (room.hostId !== socket.id) return callback?.({ error: 'Only host can end the game' });
+
+    // Notify all players
+    io.to(roomId).emit('game_ended', { message: 'Host ended the game' });
+
+    // Clear the room engine so everyone goes home
+    room.engine = null;
+    room.status = 'WAITING';
+    playerRooms.forEach((rid, pid) => {
+      if (rid === roomId) playerRooms.delete(pid);
+    });
+    rooms.delete(roomId);
+    console.log(`🛑 Host ended game in room ${roomId}`);
+    callback?.({ success: true });
+  });
+
+  socket.on('exit_room', (_, callback) => {
+    const roomId = playerRooms.get(socket.id);
+    const room = getRoom(roomId);
+    if (room) {
+      const player = room.players.find(p => p.id === socket.id);
+      const name = player?.name || 'A player';
+      room.players = room.players.filter(p => p.id !== socket.id);
+      if (room.engine?.playerMap) delete room.engine.playerMap[socket.id];
+      playerRooms.delete(socket.id);
+      socket.leave(roomId);
+      io.to(roomId).emit('player_disconnected', { playerId: socket.id, playerName: name, permanent: true });
+      emitLobby(roomId);
+      emitGameState(roomId);
+    }
+    if (callback) callback({ success: true });
+  });
+
   socket.on('next_round', (_, callback) => {
     const roomId = playerRooms.get(socket.id);
     const room = getRoom(roomId);
@@ -391,11 +429,22 @@ io.on('connection', (socket) => {
     if (roomId) {
       const room = getRoom(roomId);
       if (room) {
-        const disconnectedId = socket.id; // capture now — socket.id may remap on rejoin
+        const disconnectedId = socket.id;
+        const disconnectedPlayer = room.players.find(p => p.id === disconnectedId);
+        const disconnectedName = disconnectedPlayer?.name || 'A player';
+
         room.removePlayer(disconnectedId); // marks connected: false
         console.log(`⏳ Disconnected (grace period): ${disconnectedId} from room ${roomId}`);
 
-        // After 30s, if still disconnected (player.id still matches — not remapped by rejoin), remove them
+        // Immediately tell everyone this player went offline
+        io.to(roomId).emit('player_disconnected', {
+          playerId: disconnectedId,
+          playerName: disconnectedName,
+        });
+        emitLobby(roomId);
+        emitGameState(roomId); // refresh so connected:false shows in UI
+
+        // After 30s, if still disconnected, permanently remove
         setTimeout(() => {
           const player = room.players.find(p => p.id === disconnectedId);
           if (player && !player.connected) {
@@ -404,6 +453,7 @@ io.on('connection', (socket) => {
             if (room.engine?.playerMap) delete room.engine.playerMap[disconnectedId];
             playerRooms.delete(disconnectedId);
             emitLobby(roomId);
+            emitGameState(roomId);
           }
         }, 30000);
 
@@ -413,19 +463,15 @@ io.on('connection', (socket) => {
           console.log(`⏭ Scheduling auto-skip for disconnected player ${disconnectedId}`);
           setTimeout(() => {
             const stillDisconnected = room.players.find(p => p.id === disconnectedId && !p.connected);
-            if (!stillDisconnected) return; // came back
+            if (!stillDisconnected) return;
             const currentRs = room.engine?.roundState;
-            if (currentRs?.currentTurnPlayerId !== disconnectedId) return; // turn already moved
-            // Skip their turn — advance to next player
+            if (currentRs?.currentTurnPlayerId !== disconnectedId) return;
             const eng = room.engine;
             currentRs.currentTurnPlayerId = eng._getNextPlayer(disconnectedId);
             console.log(`⏭ Auto-skipped turn for ${disconnectedId}`);
-            io.to(roomId).emit('notification', { message: 'A player disconnected — turn skipped', type: 'warning' });
             emitGameState(roomId);
           }, 15000);
         }
-
-        emitLobby(roomId);
       }
     }
   });

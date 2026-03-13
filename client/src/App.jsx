@@ -55,6 +55,7 @@ function GameApp() {
   const [showResult, setShowResult] = useState(false);
 
   const gs = socket.gameState;
+  const { disconnectedPlayer, setDisconnectedPlayer, exitRoom } = socket;
 
   useEffect(() => {
     if (socket.lobbyState) {
@@ -68,6 +69,11 @@ function GameApp() {
   useEffect(() => {
     if (gs && gs.phase && gs.phase !== 'LOBBY') setScreen('GAME');
   }, [gs]);
+
+  // When server clears game state (host ended game), go home
+  useEffect(() => {
+    if (!gs && screen === 'GAME') setScreen('HOME');
+  }, [gs, screen]);
 
   // Show round result — triggers on phase change AND on first gs load (rejoin recovery)
   useEffect(() => {
@@ -171,6 +177,7 @@ function GameApp() {
     }
 
     console.log('[App] socket.requestMyTrump =', typeof socket.requestMyTrump, socket.requestMyTrump);
+    const amHost = gs.players?.find(p => p.id === socket.playerId)?.position === 0;
     return (
       <GameTable
         gameState={gs}
@@ -178,6 +185,8 @@ function GameApp() {
         playerId={socket.playerId}
         onPlayCard={socket.playCard}
         onRequestMyTrump={socket.requestMyTrump}
+        isHost={amHost}
+        onEndGame={() => socket.endGame()}
       />
     );
   };
@@ -202,6 +211,33 @@ function GameApp() {
           fontWeight: 'bold', zIndex: 9998, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
         }}>
           {socket.notification.message}
+        </div>
+      )}
+
+      {/* Persistent disconnect banner — always visible, can't be dismissed */}
+      {disconnectedPlayer && screen === 'GAME' && !disconnectedPlayer.permanent && (
+        <div style={{
+          position: 'fixed', top: 56, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(192,57,43,0.95)', border: '1px solid #e74c3c',
+          borderRadius: 12, padding: '12px 20px', zIndex: 9997,
+          display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+          minWidth: 260, maxWidth: 340,
+        }}>
+          <div style={{ fontSize: 22 }}>📵</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>
+              {disconnectedPlayer.name} is offline
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 2 }}>
+              Waiting for them to reconnect...
+            </div>
+          </div>
+          <button onClick={() => { exitRoom(); setDisconnectedPlayer(null); setScreen('HOME'); }} style={{
+            padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.4)',
+            background: 'rgba(0,0,0,0.3)', color: '#fff', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap',
+          }}>
+            Leave Game
+          </button>
         </div>
       )}
       {socket.error && (

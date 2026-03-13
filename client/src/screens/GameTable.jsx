@@ -9,7 +9,7 @@ const SUIT_COLORS = {
   spades: '#fff', clubs: '#fff',
 };
 
-export default function GameTable({ gameState, myHand, playerId, onPlayCard, onRequestMyTrump }) {
+export default function GameTable({ gameState, myHand, playerId, onPlayCard, onRequestMyTrump, isHost, onEndGame }) {
   const gs = gameState;
   const [myRevealedTrump, setMyRevealedTrump] = React.useState(null);
 
@@ -82,7 +82,18 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
                     : 'No trump yet'}
           </div>
         </div>
-        <ScorePill team="B" score={gs.matchScore.B} color="#e74c3c" />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <ScorePill team="B" score={gs.matchScore.B} color="#e74c3c" />
+          {isHost && (
+            <button onClick={onEndGame} style={{
+              padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(192,57,43,0.6)',
+              background: 'rgba(192,57,43,0.15)', color: '#e74c3c', cursor: 'pointer',
+              fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5,
+            }}>
+              ✕ End Game
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── TABLE ── */}
@@ -280,25 +291,36 @@ function PlayerSeat({ player, isCurrentTurn, isMe, vertical }) {
   if (!player) return <div style={{ width: vertical ? 60 : 120 }} />;
 
   const teamColor = player.team === 'A' ? '#3498db' : '#e74c3c';
+  const isOffline = player.connected === false;
 
   return (
     <div style={{
       display: 'flex', flexDirection: vertical ? 'column' : 'row',
       alignItems: 'center', gap: 8,
+      opacity: isOffline ? 0.6 : 1,
     }}>
-      <div style={{
-        width: 44, height: 44, borderRadius: '50%',
-        background: teamColor, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', fontWeight: 'bold', fontSize: 18,
-        border: isCurrentTurn ? `3px solid ${GOLD}` : '3px solid transparent',
-        boxShadow: isCurrentTurn ? `0 0 16px ${GOLD}` : 'none',
-        transition: 'all 0.3s', color: '#fff',
-      }}>
-        {player.name[0].toUpperCase()}
+      <div style={{ position: 'relative' }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: '50%',
+          background: teamColor, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontWeight: 'bold', fontSize: 18,
+          border: isCurrentTurn ? `3px solid ${GOLD}` : '3px solid transparent',
+          boxShadow: isCurrentTurn ? `0 0 16px ${GOLD}` : 'none',
+          transition: 'all 0.3s', color: '#fff',
+        }}>
+          {player.name[0].toUpperCase()}
+        </div>
+        {/* Online/offline dot */}
+        <div style={{
+          position: 'absolute', bottom: 1, right: 1,
+          width: 11, height: 11, borderRadius: '50%',
+          background: isOffline ? '#e74c3c' : '#27ae60',
+          border: '2px solid #0a1628',
+        }} />
       </div>
       <div style={{ textAlign: 'center' }}>
         <div style={{ color: isMe ? GOLD : '#ccc', fontSize: 13, fontWeight: isMe ? 'bold' : 'normal' }}>
-          {player.name}{isMe ? ' (You)' : ''}
+          {player.name}{isMe ? ' (You)' : ''}{isOffline ? ' 📵' : ''}
         </div>
         <div style={{ color: teamColor, fontSize: 11 }}>Team {player.team}</div>
         <div style={{ color: '#4a6a8a', fontSize: 11 }}>{player.cardCount} cards</div>

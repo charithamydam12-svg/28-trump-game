@@ -13,6 +13,7 @@ export function useSocket() {
   const [myHand, setMyHand]         = useState([]);
   const [notification, setNotification] = useState(null);
   const [error, setError]           = useState(null);
+  const [disconnectedPlayer, setDisconnectedPlayer] = useState(null);
 
   function showNotification(message, type = 'info') {
     setNotification({ message, type, id: Date.now() });
@@ -92,6 +93,26 @@ export function useSocket() {
       socket.on('trick_complete', ({ trickWinnerTeam, trickNumber }) =>
         showNotification(`Trick ${trickNumber} → Team ${trickWinnerTeam}!`, 'success'));
 
+      socket.on('player_disconnected', ({ playerName, permanent }) => {
+        showNotification(`${playerName} ${permanent ? 'left the game' : 'disconnected — waiting 30s...'}`, 'warning');
+        setDisconnectedPlayer({ name: playerName, permanent: !!permanent, time: Date.now() });
+      });
+
+      socket.on('player_reconnected', ({ playerName }) => {
+        showNotification(`${playerName} reconnected!`, 'success');
+        setDisconnectedPlayer(null);
+      });
+
+      socket.on('game_ended', ({ message }) => {
+        showNotification(message || 'Host ended the game', 'warning');
+        try { localStorage.removeItem('28trump_session'); } catch(e) {}
+        setTimeout(() => {
+          setGameState(null);
+          setMyHand([]);
+          setRoomId(null);
+        }, 2000);
+      });
+
     }).catch((e) => console.warn('socket.io-client load error:', e));
 
     return () => { try { socket?.disconnect(); } catch (_) {} };
@@ -145,12 +166,20 @@ export function useSocket() {
     });
   }, []);
 
+  const exitRoom = useCallback(() => {
+    emit('exit_room', {}).catch(() => {});
+    try { localStorage.removeItem('28trump_session'); } catch(e) {}
+  }, [emit]);
+
+  const endGame = useCallback(() => emit('end_game', {}), [emit]);
+
   return {
     connected, playerId, roomId,
     lobbyState, gameState, myHand,
     notification, error,
+    disconnectedPlayer, setDisconnectedPlayer,
     createRoom, joinRoom, swapTeam, startGame, requestMyTrump,
     losingTeamResponse, placeBid, passBid,
-    selectTrump, declareBlindTrump, playCard, nextRound,
+    selectTrump, declareBlindTrump, playCard, nextRound, exitRoom, endGame,
   };
 }

@@ -572,6 +572,7 @@ class GameEngine {
         hasBid: rs.playerBids?.[p.id] !== undefined,
         hasPassed: rs.passedPlayers?.has(p.id) || false,
         bidValue: rs.playerBids?.[p.id],
+        connected: p.connected !== false, // true unless explicitly false
       })),
     };
   }
