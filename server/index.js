@@ -279,12 +279,7 @@ io.on('connection', (socket) => {
 
     callback({ success: true });
 
-    if (result.trickResult) {
-      io.to(roomId).emit('trick_complete', result.trickResult);
-    }
-
     // Only broadcast trump_revealed when it JUST flipped to true this move
-    // Check by seeing if result contains the newly revealed state
     const gs = room.getGameState();
     if (result.trumpJustRevealed && gs?.trump?.suit) {
       const sym = { spades:'♠', hearts:'♥', diamonds:'♦', clubs:'♣' };
@@ -296,8 +291,24 @@ io.on('connection', (socket) => {
       });
     }
 
-    const extra = result.roundResult ? { roundResult: result.roundResult } : {};
-    emitGameState(roomId, extra);
+    if (result.trickResult) {
+      // Phase is now TRICK_RESULT — emit state WITH all 4 cards visible
+      io.to(roomId).emit('trick_complete', result.trickResult);
+      emitGameState(roomId);
+
+      // After 2s delay, advance to next trick and emit new state
+      setTimeout(() => {
+        const advRoom = getRoom(roomId);
+        if (!advRoom) return;
+        const advResult = advRoom.advanceTrick();
+        if (!advResult) return;
+        const extra = advResult.roundResult ? { roundResult: advResult.roundResult } : {};
+        emitGameState(roomId, extra);
+      }, 2000);
+    } else {
+      const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+      emitGameState(roomId, extra);
+    }
   });
 
   // ── NEXT ROUND ────────────────────────────────

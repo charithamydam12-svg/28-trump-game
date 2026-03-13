@@ -408,16 +408,34 @@ class GameEngine {
     });
 
     rs.trickCount++;
-    rs.currentTrick = [];
+    // DO NOT clear currentTrick yet — keep 4 cards visible for display delay
     rs.leadSuit = null;
+    rs.lastTrickWinner = winnerId;
 
     const trickResult = { trickWinner: winnerId, trickWinnerTeam: winnerTeam, trickNumber: rs.trickCount };
 
-    if (rs.trickCount === 7) return this._endRound();
+    // Mark trick as complete but frozen — server will advance after delay
+    rs.trickPending = { winnerId, isLastTrick: rs.trickCount === 7 };
+    rs.phase = PHASE.TRICK_RESULT;
+
+    return { ...this._getPublicState(), trickResult };
+  }
+
+  // Called after display delay to actually advance to next trick
+  advanceTrick() {
+    const rs = this.roundState;
+    if (!rs.trickPending) return null;
+
+    const { winnerId, isLastTrick } = rs.trickPending;
+    rs.trickPending = null;
+    rs.currentTrick = [];
+    rs.lastTrickWinner = null;
+
+    if (isLastTrick) return this._endRound();
 
     rs.currentTurnPlayerId = winnerId;
     rs.phase = PHASE.PLAYING;
-    return { ...this._getPublicState(), trickResult };
+    return this._getPublicState();
   }
 
   _endRound() {
@@ -535,6 +553,7 @@ class GameEngine {
       trickCount: rs.trickCount || 0,
       currentTurnPlayerId: rs.currentTurnPlayerId,
       leadSuit: rs.leadSuit,
+      lastTrickWinner: rs.lastTrickWinner || null,
 
       trickCounts: {
         A: rs.completedTricks?.A?.length || 0,

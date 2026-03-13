@@ -112,7 +112,17 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
         padding: '16px 20px 24px',
         position: 'relative', zIndex: 10,
       }}>
-        {isMyTurn && (
+        {gs.phase === 'TRICK_RESULT' && gs.lastTrickWinner && (
+          <div style={{
+            textAlign: 'center', marginBottom: 10, padding: '6px 16px',
+            background: 'rgba(212,175,55,0.15)', borderRadius: 10,
+            border: '1px solid rgba(212,175,55,0.4)',
+            color: GOLD, fontWeight: 'bold', fontSize: 14, letterSpacing: 1,
+          }}>
+            🏆 {gs.players?.find(p => p.id === gs.lastTrickWinner)?.name} wins the trick!
+          </div>
+        )}
+        {gs.phase === 'PLAYING' && isMyTurn && (
           <>
             <div style={{
               textAlign: 'center', color: GOLD, fontWeight: 'bold',
@@ -123,7 +133,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
 
           </>
         )}
-        {!isMyTurn && (
+        {gs.phase === 'PLAYING' && !isMyTurn && (
           <div style={{ textAlign: 'center', color: '#4a6a8a', fontSize: 13, marginBottom: 10 }}>
             Waiting for {gs.players.find((p) => p.id === gs.currentTurnPlayerId)?.name}...
           </div>

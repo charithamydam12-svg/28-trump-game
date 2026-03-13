@@ -145,6 +145,11 @@ class Room {
     return this.engine.playCard(playerId, cardId);
   }
 
+  advanceTrick() {
+    if (!this.engine) return null;
+    return this.engine.advanceTrick();
+  }
+
   // ─────────────────────────────────────────────
   // STATE GETTERS
   // ─────────────────────────────────────────────
