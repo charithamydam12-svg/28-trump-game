@@ -17,13 +17,20 @@ const CLIENT_URL = process.env.CLIENT_URL || '*';
 
 const io = new Server(httpServer, {
   cors: {
-    origin: CLIENT_URL,
+    origin: '*',
     methods: ['GET', 'POST'],
   },
-  // Keep connections alive through Railway's proxy
   transports: ['websocket', 'polling'],
   pingTimeout: 60000,
   pingInterval: 25000,
+});
+
+// Also set CORS headers on express for polling fallback
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
 });
 
 app.use(cors());
