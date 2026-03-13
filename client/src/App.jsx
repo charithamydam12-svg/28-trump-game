@@ -187,6 +187,7 @@ function GameApp() {
         onRequestMyTrump={socket.requestMyTrump}
         isHost={amHost}
         onEndGame={() => socket.endGame()}
+        onExitGame={() => { socket.exitRoom(); setScreen('HOME'); }}
       />
     );
   };

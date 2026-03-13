@@ -9,7 +9,7 @@ const SUIT_COLORS = {
   spades: '#fff', clubs: '#fff',
 };
 
-export default function GameTable({ gameState, myHand, playerId, onPlayCard, onRequestMyTrump, isHost, onEndGame }) {
+export default function GameTable({ gameState, myHand, playerId, onPlayCard, onRequestMyTrump, isHost, onEndGame, onExitGame }) {
   const gs = gameState;
   const [myRevealedTrump, setMyRevealedTrump] = React.useState(null);
 
@@ -84,15 +84,24 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
           <ScorePill team="B" score={gs.matchScore.B} color="#e74c3c" />
-          {isHost && (
-            <button onClick={onEndGame} style={{
-              padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(192,57,43,0.6)',
-              background: 'rgba(192,57,43,0.15)', color: '#e74c3c', cursor: 'pointer',
+          <div style={{ display: 'flex', gap: 6 }}>
+            {isHost && (
+              <button onClick={onEndGame} style={{
+                padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(192,57,43,0.6)',
+                background: 'rgba(192,57,43,0.15)', color: '#e74c3c', cursor: 'pointer',
+                fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5,
+              }}>
+                ✕ End Game
+              </button>
+            )}
+            <button onClick={onExitGame} style={{
+              padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(74,106,138,0.6)',
+              background: 'rgba(74,106,138,0.15)', color: '#7f8c8d', cursor: 'pointer',
               fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5,
             }}>
-              ✕ End Game
+              🚪 Exit
             </button>
-          )}
+          </div>
         </div>
       </div>
 
