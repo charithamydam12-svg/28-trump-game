@@ -14,7 +14,19 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
   const [myRevealedTrump, setMyRevealedTrump] = React.useState(null);
 
   // Reset when new round starts
-  React.useEffect(() => { setMyRevealedTrump(null); }, [gs.gameNumber]);
+  React.useEffect(() => { setMyRevealedTrump(null); }, [gs?.gameNumber]);
+
+  // Don't render if game state not ready
+  if (!gs || !gs.players || !gs.trump) {
+    return (
+      <div style={{
+        minHeight: '100vh', background: '#0a1628', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', color: '#d4af37', fontSize: 20
+      }}>
+        Loading game...
+      </div>
+    );
+  }
 
   const handleShowTrump = () => {
     console.log('SHOW TRUMP CLICKED');
@@ -26,7 +38,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
     }).catch(e => console.log('TRUMP ERROR:', e));
   };
 
-  const myPlayer = gs.players.find((p) => p.id === playerId);
+  const myPlayer = gs.players?.find((p) => p.id === playerId);
   const myTeam = myPlayer?.team;
   const isMyTurn = gs.currentTurnPlayerId === playerId;
   const leadSuit = gs.leadSuit;

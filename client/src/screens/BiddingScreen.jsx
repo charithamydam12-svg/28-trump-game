@@ -15,6 +15,18 @@ export default function BiddingScreen({
 }) {
   const [customBid, setCustomBid] = useState('');
   const gs = gameState;
+
+  if (!gs || !gs.players || !gs.bidding) {
+    return (
+      <div style={{
+        minHeight: '100vh', background: '#0a1628', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', color: '#d4af37', fontSize: 20
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
   const me = gs.players.find(p => p.id === playerId);
   const myTeam = me?.team;
 
