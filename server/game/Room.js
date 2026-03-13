@@ -3,7 +3,7 @@
 // Handles lobby, player assignment, team formation
 // ============================================================
 
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const { GameEngine } = require('./GameEngine');
 
 class Room {
@@ -35,7 +35,7 @@ class Room {
 
     this.players.push({
       id: playerId,          // current socket.id — changes on reconnect
-      persistentId: uuidv4(), // stable across reconnects — saved in client localStorage
+      persistentId: randomUUID(), // stable across reconnects — saved in client localStorage
       name: playerName,
       team,
       position,
