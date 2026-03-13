@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-const SERVER_URL = 'http://localhost:3001';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
 export function useSocket() {
   const socketRef = useRef(null);
@@ -66,6 +66,7 @@ export function useSocket() {
 
       // game_state has myHand (private) and roundResult embedded
       socket.on('game_state', (s) => {
+        if (!s) return; // null game state (lobby phase) — ignore, don't overwrite
         if (Array.isArray(s.myHand)) {
           setMyHand(s.myHand);
         }

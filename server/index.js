@@ -12,11 +12,18 @@ const Room = require('./game/Room');
 const app = express();
 const httpServer = createServer(app);
 
+const PORT = process.env.PORT || 3001;
+const CLIENT_URL = process.env.CLIENT_URL || '*';
+
 const io = new Server(httpServer, {
   cors: {
-    origin: '*', // Update to your frontend URL in production
+    origin: CLIENT_URL,
     methods: ['GET', 'POST'],
   },
+  // Keep connections alive through Railway's proxy
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 app.use(cors());
@@ -38,7 +45,7 @@ function getRoom(roomId) {
 
 function emitGameState(roomId, extraData = {}) {
   const room = getRoom(roomId);
-  if (!room) return;
+  if (!room || !room.engine) return; // no game started yet — don't send null game state
 
   // Send each player their OWN personalised state:
   // - their private hand (only their cards)
@@ -420,7 +427,6 @@ app.get('/health', (req, res) => {
 // ─────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────
-const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`🚀 28 Trump Game Server running on port ${PORT}`);
   console.log(`📡 Socket.io ready`);

@@ -58,12 +58,15 @@ function GameApp() {
 
   useEffect(() => {
     if (socket.lobbyState) {
-      if (screen === 'HOME' || screen === 'RECONNECTING') setScreen('LOBBY');
+      // Always prefer lobby screen when lobby state arrives (covers rejoin into lobby)
+      if (screen === 'HOME' || screen === 'RECONNECTING' || (screen === 'GAME' && !gs)) {
+        setScreen('LOBBY');
+      }
     }
   }, [socket.lobbyState]);
 
   useEffect(() => {
-    if (gs) setScreen('GAME');
+    if (gs && gs.phase && gs.phase !== 'LOBBY') setScreen('GAME');
   }, [gs]);
 
   // Show round result — triggers on phase change AND on first gs load (rejoin recovery)
@@ -103,13 +106,31 @@ function GameApp() {
   };
 
 
+  // If stuck on GAME screen with no game state for 4s, clear and go home
+  useEffect(() => {
+    if (screen !== 'GAME' || gs) return;
+    const t = setTimeout(() => {
+      try { localStorage.removeItem('28trump_session'); } catch (e) { }
+      setScreen('HOME');
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [screen, gs]);
+
   const renderGame = () => {
     if (!gs) return (
       <div style={{
         minHeight: '100vh', background: '#0a1628', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', color: '#d4af37', fontSize: 20
+        flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16
       }}>
-        Loading game...
+        <div style={{ color: '#d4af37', fontSize: 20 }}>Loading game...</div>
+        <div style={{ color: '#4a6a8a', fontSize: 13 }}>Redirecting in a moment...</div>
+        <button onClick={() => { try { localStorage.removeItem('28trump_session'); } catch (e) { } setScreen('HOME'); }}
+          style={{
+            marginTop: 8, padding: '10px 28px', borderRadius: 10, background: '#d4af37',
+            border: 'none', color: '#0a1628', fontSize: 14, cursor: 'pointer', fontWeight: 'bold'
+          }}>
+          Go Home Now
+        </button>
       </div>
     );
 
