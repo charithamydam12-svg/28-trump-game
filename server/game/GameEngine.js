@@ -297,7 +297,10 @@ class GameEngine {
     // Deal remaining 3 cards
     rs.hands = dealNextThree(rs.remaining, rs.hands, this.players.map(p => p.id));
     rs.phase = PHASE.PLAYING;
-    rs.currentTurnPlayerId = playerId;
+
+    // Game 1 (equal scores): trump picker leads
+    // Game 2+: random player from winning team leads
+    rs.currentTurnPlayerId = this._getFirstLeader(playerId);
 
     return this._getPublicState();
   }
@@ -323,8 +326,7 @@ class GameEngine {
     rs.trumpRevealed = false;
     rs.hands = dealNextThree(rs.remaining, rs.hands, this.players.map(p => p.id));
     rs.phase = PHASE.PLAYING;
-    // Trump picker leads first
-    rs.currentTurnPlayerId = playerId;
+    rs.currentTurnPlayerId = this._getFirstLeader(playerId);
 
     return this._getPublicState();
   }
@@ -502,6 +504,21 @@ class GameEngine {
   _getNextPlayer(currentId) {
     const pos = this.playerMap[currentId].position;
     return this.players.find(p => p.position === (pos + 1) % 4)?.id;
+  }
+
+  // Who leads the first trick:
+  // - Game 1 (scores equal 0:0): trump picker leads
+  // - Game 2+: random player from the winning team (higher score) leads
+  _getFirstLeader(trumpPickerId) {
+    const { A, B } = this.matchScore;
+    // Equal scores = game 1 or tied — trump picker leads
+    if (A === B) return trumpPickerId;
+
+    const winningTeam = A > B ? 'A' : 'B';
+    const winningPlayers = this.players.filter(p => p.team === winningTeam);
+    // Pick randomly between the 2 winning team players
+    const leader = winningPlayers[Math.floor(Math.random() * winningPlayers.length)];
+    return leader.id;
   }
 
   _error(msg) { return { error: true, message: msg }; }
