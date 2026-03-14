@@ -483,7 +483,7 @@ io.on('connection', (socket) => {
         emitLobby(roomId);
         emitGameState(roomId); // refresh so connected:false shows in UI
 
-        // After 30s, if still disconnected, permanently remove
+        // After 5 minutes, if still disconnected, permanently remove
         setTimeout(() => {
           const player = room.players.find(p => p.id === disconnectedId);
           if (player && !player.connected) {
@@ -494,9 +494,9 @@ io.on('connection', (socket) => {
             emitLobby(roomId);
             emitGameState(roomId);
           }
-        }, 30000);
+        }, 300000); // 5 minutes grace period
 
-        // If it's this player's turn during a game, auto-skip after 15s
+        // If it's this player's turn during a game, auto-skip after 2 minutes
         const rs = room.engine?.roundState;
         if (rs?.phase === 'PLAYING' && rs.currentTurnPlayerId === disconnectedId) {
           console.log(`⏭ Scheduling auto-skip for disconnected player ${disconnectedId}`);
@@ -509,7 +509,7 @@ io.on('connection', (socket) => {
             currentRs.currentTurnPlayerId = eng._getNextPlayer(disconnectedId);
             console.log(`⏭ Auto-skipped turn for ${disconnectedId}`);
             emitGameState(roomId);
-          }, 15000);
+          }, 120000); // 2 minute auto-skip
         }
       }
     }

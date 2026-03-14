@@ -239,7 +239,7 @@ function GameApp() {
               {disconnectedPlayer.name} is offline
             </div>
             <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 2 }}>
-              Waiting for them to reconnect...
+              Waiting for them to reconnect (up to 5 mins)...
             </div>
           </div>
           <button onClick={() => { exitRoom(); setDisconnectedPlayer(null); setScreen('HOME'); }} style={{

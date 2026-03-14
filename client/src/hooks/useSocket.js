@@ -97,7 +97,7 @@ export function useSocket() {
         showNotification(`Trick ${trickNumber} → Team ${trickWinnerTeam}!`, 'success'));
 
       socket.on('player_disconnected', ({ playerName, permanent }) => {
-        showNotification(`${playerName} ${permanent ? 'left the game' : 'disconnected — waiting 30s...'}`, 'warning');
+        showNotification(`${playerName} ${permanent ? 'left the game' : 'disconnected — waiting up to 5 mins...'}`, 'warning');
         setDisconnectedPlayer({ name: playerName, permanent: !!permanent, time: Date.now() });
       });
 
