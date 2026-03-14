@@ -14,6 +14,7 @@ export function useSocket() {
   const [notification, setNotification] = useState(null);
   const [error, setError]           = useState(null);
   const [disconnectedPlayer, setDisconnectedPlayer] = useState(null);
+  const [trumpRevealFlash, setTrumpRevealFlash] = useState(null);
 
   function showNotification(message, type = 'info') {
     setNotification({ message, type, id: Date.now() });
@@ -86,8 +87,10 @@ export function useSocket() {
       socket.on('blind_trump_declared', ({ message }) =>
         showNotification('🎴 ' + message, 'warning'));
 
-      socket.on('trump_revealed', ({ symbol, suit, playedBy }) => {
-        showNotification(`🃏 Trump revealed! ${playedBy} played ${symbol} — Trump is now open!`, 'warning');
+      socket.on('trump_revealed', ({ symbol, suit, playedBy, card }) => {
+        showNotification(`🃏 Trump revealed! ${playedBy} played ${symbol}`, 'warning');
+        setTrumpRevealFlash({ suit, symbol, card, playedBy });
+        setTimeout(() => setTrumpRevealFlash(null), 3500);
       });
 
       socket.on('trick_complete', ({ trickWinnerTeam, trickNumber }) =>
@@ -178,6 +181,7 @@ export function useSocket() {
     lobbyState, gameState, myHand,
     notification, error,
     disconnectedPlayer, setDisconnectedPlayer,
+    trumpRevealFlash,
     createRoom, joinRoom, swapTeam, startGame, requestMyTrump,
     losingTeamResponse, placeBid, passBid,
     selectTrump, declareBlindTrump, playCard, nextRound, exitRoom, endGame,

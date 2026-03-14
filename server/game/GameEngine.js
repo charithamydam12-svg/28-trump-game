@@ -365,6 +365,16 @@ class GameEngine {
       }
     }
 
+    // ── mustPlayTrump: player who showed trump must play a trump card ──
+    // Exception: if they have no trump cards at all, they can play anything
+    if (rs.mustPlayTrump === playerId) {
+      const hasTrump = hand.some(c => c.suit === rs.trumpSuit);
+      if (hasTrump && card.suit !== rs.trumpSuit) {
+        return this._error('You showed trump — you must play a trump card');
+      }
+      rs.mustPlayTrump = null; // clear after this play
+    }
+
     // ── Remove card from wherever it was ──
     if (isPlayingReserved) {
       rs.reservedTrumpCard = null; // consumed
@@ -559,6 +569,8 @@ class GameEngine {
         canDeclareBlind: rs.canDeclareBlind || false,
         trumpPickerPlayerId: rs.trumpPickerPlayerId,
         suitHidden: rs.trumpSuit !== null && !rs.trumpRevealed,
+        // Show full trump card to everyone once revealed
+        card: rs.trumpRevealed ? (rs.trumpCard || rs.blindTrumpCard || null) : null,
       },
 
       losingTeam: rs.losingTeam || null,
@@ -571,6 +583,7 @@ class GameEngine {
       currentTurnPlayerId: rs.currentTurnPlayerId,
       leadSuit: rs.leadSuit,
       lastTrickWinner: rs.lastTrickWinner || null,
+      mustPlayTrump: rs.mustPlayTrump || null,
 
       trickCounts: {
         A: rs.completedTricks?.A?.length || 0,

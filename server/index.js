@@ -285,10 +285,12 @@ io.on('connection', (socket) => {
     if (result.trumpJustRevealed && gs?.trump?.suit) {
       const sym = { spades:'♠', hearts:'♥', diamonds:'♦', clubs:'♣' };
       const player = room.players.find(p => p.id === socket.id);
+      const rs = room.engine?.roundState;
       io.to(roomId).emit('trump_revealed', {
         suit: gs.trump.suit,
         symbol: sym[gs.trump.suit],
         playedBy: player?.name || 'A player',
+        card: rs?.trumpCard || rs?.blindTrumpCard || null,
       });
     }
 
@@ -402,6 +404,9 @@ io.on('connection', (socket) => {
     // Reveal trump to ALL players now
     rs.trumpRevealed = true;
 
+    // Player who showed trump MUST play a trump card next
+    rs.mustPlayTrump = socket.id;
+
     // Merge reserved trump card back into picker's hand — trump is no longer hidden
     if (rs.reservedTrumpCard) {
       const { playerId: pickerId, card: reservedCard } = rs.reservedTrumpCard;
@@ -412,13 +417,14 @@ io.on('connection', (socket) => {
     const SYMS = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
     const player = room.players.find(p => p.id === socket.id);
 
-    callback({ success: true, trumpSuit: rs.trumpSuit });
+    callback({ success: true, trumpSuit: rs.trumpSuit, trumpCard: rs.trumpCard || rs.blindTrumpCard || null });
 
     // Broadcast reveal to everyone
     io.to(roomId).emit('trump_revealed', {
       suit: rs.trumpSuit,
       symbol: SYMS[rs.trumpSuit],
       playedBy: player?.name || 'A player',
+      card: rs.trumpCard || rs.blindTrumpCard || null,
     });
     emitGameState(roomId);
   });

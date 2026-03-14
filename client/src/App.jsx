@@ -188,6 +188,7 @@ function GameApp() {
         isHost={amHost}
         onEndGame={() => socket.endGame()}
         onExitGame={() => { socket.exitRoom(); setScreen('HOME'); }}
+        trumpRevealFlash={socket.trumpRevealFlash}
       />
     );
   };

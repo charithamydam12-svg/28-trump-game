@@ -9,12 +9,14 @@ const SUIT_COLORS = {
   spades: '#fff', clubs: '#fff',
 };
 
-export default function GameTable({ gameState, myHand, playerId, onPlayCard, onRequestMyTrump, isHost, onEndGame, onExitGame }) {
+export default function GameTable({ gameState, myHand, playerId, onPlayCard, onRequestMyTrump, isHost, onEndGame, onExitGame, trumpRevealFlash }) {
   const gs = gameState;
   const [myRevealedTrump, setMyRevealedTrump] = React.useState(null);
 
   // Reset when new round starts
-  React.useEffect(() => { setMyRevealedTrump(null); }, [gs?.gameNumber]);
+  React.useEffect(() => {
+    setMyRevealedTrump(null);
+  }, [gs?.gameNumber]);
 
   // Don't render if game state not ready
   if (!gs || !gs.players || !gs.trump) {
@@ -34,7 +36,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
     // Use raw socket emit directly - bypass the async wrapper
     onRequestMyTrump().then(res => {
       console.log('TRUMP RESPONSE:', res);
-      if (res && res.trumpSuit) setMyRevealedTrump(res.trumpSuit);
+      if (res && res.trumpSuit) setMyRevealedTrump({ suit: res.trumpSuit, card: res.trumpCard || null });
     }).catch(e => console.log('TRUMP ERROR:', e));
   };
 
@@ -45,7 +47,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
   const hasLeadSuit = leadSuit ? myHand.some(c => c.suit === leadSuit) : true;
   const trumpStillHidden = gs.trump.suitHidden && !gs.trump.revealed;
   // Show the button only when: my turn, in a trick (not leading), no lead suit cards, trump not yet revealed to me
-  const canShowTrump = isMyTurn && gs.currentTrick?.length > 0 && !hasLeadSuit && trumpStillHidden && !myRevealedTrump && !gs.trump.iKnowTrump;
+  const canShowTrump = isMyTurn && gs.currentTrick?.length > 0 && !hasLeadSuit && trumpStillHidden && !myRevealedTrump?.suit && !gs.trump.iKnowTrump;
 
   // Sort players around the table: me bottom, left, top, right
   const orderedPlayers = getTableOrder(gs.players, playerId);
@@ -76,7 +78,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
               : gs.trump.iKnowTrump && gs.trump.suit
                 ? <span style={{ color: '#f39c12' }}>🔒 Your Trump: {SUIT_SYMBOLS[gs.trump.suit]} (secret)</span>
                 : myRevealedTrump
-                  ? <span style={{ color: '#f39c12' }}>🔒 Trump: {SUIT_SYMBOLS[myRevealedTrump]} (you peeked)</span>
+                  ? <span style={{ color: '#f39c12' }}>🔒 Trump: {SUIT_SYMBOLS[myRevealedTrump.suit]} (you peeked)</span>
                   : gs.trump.suitHidden
                     ? <span style={{ color: '#8e44ad' }}>🔒 Trump: Hidden</span>
                     : 'No trump yet'}
@@ -150,7 +152,11 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
             }}>
               ⭐ YOUR TURN — Play a card
             </div>
-
+            {gs.mustPlayTrump === playerId && myHand.some(c => c.suit === gs.trump?.suit) && (
+              <div style={{ textAlign: 'center', color: '#e74c3c', fontSize: 12, marginBottom: 6, fontWeight: 'bold' }}>
+                ⚠️ You showed trump — must play a trump card {SUIT_SYMBOLS[gs.trump?.suit]}
+              </div>
+            )}
           </>
         )}
         {gs.phase === 'PLAYING' && !isMyTurn && (
@@ -166,6 +172,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
               playable={isMyTurn}
               leadSuit={gs.leadSuit}
               hand={myHand}
+              mustPlayTrump={gs.mustPlayTrump === playerId ? gs.trump?.suit : null}
               onClick={() => isMyTurn && onPlayCard(card.id)}
             />
           ))}
@@ -242,6 +249,34 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
           <div style={{ color: '#c39bd3', fontSize: 12, marginTop: 5, textShadow: '0 1px 4px #000' }}>
             No {leadSuit} cards — tap to peek
           </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Trump reveal flash — shown once for 3 seconds */}
+      {trumpRevealFlash && ReactDOM.createPortal(
+        <div style={{
+          position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 11000, pointerEvents: 'none',
+        }}>
+          <div style={{
+            background: 'rgba(10,22,40,0.92)', border: `2px solid ${['hearts', 'diamonds'].includes(trumpRevealFlash.suit) ? '#e74c3c' : '#d4af37'}`,
+            borderRadius: 20, padding: '24px 40px', textAlign: 'center',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.7)',
+            animation: 'fadeInOut 3.5s ease forwards',
+          }}>
+            <div style={{ color: '#7f8c8d', fontSize: 12, letterSpacing: 2, marginBottom: 8 }}>TRUMP CARD</div>
+            <div style={{
+              fontSize: 56, fontWeight: 'bold', lineHeight: 1,
+              color: ['hearts', 'diamonds'].includes(trumpRevealFlash.suit) ? '#e74c3c' : '#fff',
+            }}>
+              {trumpRevealFlash.card ? `${trumpRevealFlash.card.rank}${trumpRevealFlash.symbol}` : trumpRevealFlash.symbol}
+            </div>
+            <div style={{ color: '#7f8c8d', fontSize: 12, marginTop: 10 }}>
+              {trumpRevealFlash.playedBy} revealed trump
+            </div>
+          </div>
+          <style>{`@keyframes fadeInOut { 0%{opacity:0;transform:scale(0.8)} 15%{opacity:1;transform:scale(1)} 75%{opacity:1} 100%{opacity:0;transform:scale(0.9)} }`}</style>
         </div>,
         document.body
       )}
@@ -339,13 +374,18 @@ function PlayerSeat({ player, isCurrentTurn, isMe, vertical }) {
 }
 
 // ─── PLAYING CARD ─────────────────────────────────────────────
-function PlayingCard({ card, playable, leadSuit, hand, onClick }) {
+function PlayingCard({ card, playable, leadSuit, hand, onClick, mustPlayTrump }) {
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
 
   // Check if this card can be legally played
   const hasLeadSuit = leadSuit ? hand.some((c) => c.suit === leadSuit) : true;
   const isLegal = !leadSuit || !hasLeadSuit || card.suit === leadSuit;
-  const disabled = playable && !isLegal;
+
+  // mustPlayTrump: if player showed trump, must play trump suit (unless no trump cards)
+  const hasTrumpCards = mustPlayTrump ? hand.some(c => c.suit === mustPlayTrump) : false;
+  const trumpBlocked = mustPlayTrump && hasTrumpCards && card.suit !== mustPlayTrump;
+
+  const disabled = playable && (!isLegal || trumpBlocked);
 
   return (
     <div
