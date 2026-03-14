@@ -153,6 +153,17 @@ export function useSocket() {
   const losingTeamResponse = useCallback((w)   => emit('losing_team_response', { wantsToBid: w }), [emit]);
   const placeBid           = useCallback((v)   => emit('place_bid',            { bidValue: v }), [emit]);
   const passBid            = useCallback(()    => emit('pass_bid'),            [emit]);
+  const placeBidJohn = useCallback(() => {
+    console.log('[placeBidJohn] calling emit');
+    return emit('place_bid_john', {}).then(r => {
+      console.log('[placeBidJohn] result:', r);
+      return r;
+    });
+  }, [emit]);
+  const respondMidgameJohn = useCallback((a) => emit('respond_midgame_john', { acceptJohn: a }).then(r => {
+    console.log('[respondMidgameJohn] result:', r);
+    return r;
+  }), [emit]);
   const selectTrump        = useCallback((s)   => emit('select_trump',         { suit: s }), [emit]);
   const declareBlindTrump  = useCallback(()    => emit('declare_blind_trump'), [emit]);
   const playCard           = useCallback((id)  => emit('play_card',            { cardId: id }), [emit]);
@@ -183,7 +194,7 @@ export function useSocket() {
     disconnectedPlayer, setDisconnectedPlayer,
     trumpRevealFlash,
     createRoom, joinRoom, swapTeam, startGame, requestMyTrump,
-    losingTeamResponse, placeBid, passBid,
+    losingTeamResponse, placeBid, passBid, placeBidJohn, respondMidgameJohn,
     selectTrump, declareBlindTrump, playCard, nextRound, exitRoom, endGame,
   };
 }

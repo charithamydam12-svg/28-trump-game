@@ -150,6 +150,14 @@ class Room {
     return this.engine.advanceTrick();
   }
 
+  placeBidJohn(playerId) {
+    return this.engine.placeBidJohn(playerId);
+  }
+
+  respondMidgameJohn(playerId, acceptJohn) {
+    return this.engine.respondMidgameJohn(playerId, acceptJohn);
+  }
+
   // ─────────────────────────────────────────────
   // STATE GETTERS
   // ─────────────────────────────────────────────

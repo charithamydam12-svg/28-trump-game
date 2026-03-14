@@ -37,7 +37,7 @@ class ErrorBoundary extends Component {
   }
 }
 
-const BIDDING_PHASES = ['BIDDING', 'ASK_LOSING_TEAM', 'TRUMP_SELECTION'];
+const BIDDING_PHASES = ['BIDDING', 'ASK_LOSING_TEAM', 'TRUMP_SELECTION', 'JOHN_OPTION'];
 
 function GameApp() {
   const socket = useSocket();
@@ -171,6 +171,8 @@ function GameApp() {
           gameState={gs} myHand={socket.myHand} playerId={socket.playerId}
           onLosingTeamResponse={socket.losingTeamResponse}
           onPlaceBid={socket.placeBid} onPassBid={socket.passBid}
+          onPlaceBidJohn={socket.placeBidJohn}
+          onRespondMidgameJohn={socket.respondMidgameJohn}
           onSelectTrump={socket.selectTrump} onDeclareBlindTrump={socket.declareBlindTrump}
         />
       );

@@ -8,9 +8,57 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
   const {
     roundPoints, target, trumpTeam, opponentTeam,
     roundWinner, matchPointsAwarded, matchScore,
+    isDraw, drawReason,
   } = result;
 
   const winnerColor = roundWinner === 'A' ? '#3498db' : '#e74c3c';
+
+  // ── DRAW screen ──
+  if (isDraw) {
+    return (
+      <div style={overlayStyle}>
+        <div style={cardStyle}>
+          <div style={{ color: GOLD, fontSize: 13, letterSpacing: 3, marginBottom: 8, textTransform: 'uppercase' }}>
+            Round Over
+          </div>
+          <div style={{ fontSize: 36, fontWeight: 'bold', color: '#f39c12', marginBottom: 4 }}>
+            🤝 Draw!
+          </div>
+          <div style={{ color: '#8fa8c8', marginBottom: 24, fontSize: 14 }}>
+            Both teams get 0 match points
+          </div>
+          <div style={{
+            background: 'rgba(243,156,18,0.1)', border: '1px solid rgba(243,156,18,0.3)',
+            borderRadius: 12, padding: '14px 20px', marginBottom: 24, fontSize: 13, color: '#f39c12',
+          }}>
+            {drawReason}
+          </div>
+
+          {/* Match score */}
+          <div style={{ display: 'flex', gap: 24, marginBottom: 28, justifyContent: 'center' }}>
+            <MatchPill team="A" score={matchScore.A} color="#3498db" />
+            <div style={{ color: '#4a6a8a', alignSelf: 'center', fontWeight: 'bold' }}>/ 12</div>
+            <MatchPill team="B" score={matchScore.B} color="#e74c3c" />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            {isHost ? (
+              <button onClick={onNextRound} style={goldBtn}>
+                ▶ Start Next Round
+              </button>
+            ) : (
+              <div style={{
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 12, padding: '14px 28px', color: '#6b8aaa', fontSize: 14,
+              }}>
+                ⏳ Waiting for host to start next round...
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={overlayStyle}>
@@ -23,6 +71,7 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
         </div>
         <div style={{ color: '#8fa8c8', marginBottom: 28, fontSize: 14 }}>
           +{matchPointsAwarded} match point{matchPointsAwarded > 1 ? 's' : ''}
+          {result.isJohn && <span style={{ color: '#f39c12', marginLeft: 8 }}>🃏 John</span>}
         </div>
 
         {/* Points breakdown */}

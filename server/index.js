@@ -191,7 +191,8 @@ io.on('connection', (socket) => {
 
     console.log(`🎮 Game started in room ${roomId}`);
     callback({ success: true });
-    emitGameState(roomId);
+    const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+    emitGameState(roomId, extra);
   });
 
   // ── LOSING TEAM RESPONSE ──────────────────────
@@ -208,6 +209,35 @@ io.on('connection', (socket) => {
   });
 
   // ── PLACE BID ─────────────────────────────────
+  // ── JOHN BID ──────────────────────────────────
+  socket.on('place_bid_john', (_, callback) => {
+    try {
+      const roomId = playerRooms.get(socket.id);
+      const room = getRoom(roomId);
+      if (!room) return callback({ error: 'Not in a room' });
+      console.log('[place_bid_john] socket:', socket.id, 'room:', roomId);
+      const result = room.placeBidJohn(socket.id);
+      console.log('[place_bid_john] result:', JSON.stringify(result?.error || 'ok'));
+      if (result.error) return callback({ error: result.message || result.error });
+      callback({ success: true });
+      emitGameState(roomId);
+    } catch(e) {
+      console.error('[place_bid_john] ERROR:', e.message, e.stack);
+      callback({ error: e.message });
+    }
+  });
+
+  // ── MID-GAME JOHN RESPONSE ────────────────────
+  socket.on('respond_midgame_john', ({ acceptJohn }, callback) => {
+    const roomId = playerRooms.get(socket.id);
+    const room = getRoom(roomId);
+    if (!room) return callback({ error: 'Not in a room' });
+    const result = room.respondMidgameJohn(socket.id, acceptJohn);
+    if (result.error) return callback(result);
+    callback({ success: true });
+    emitGameState(roomId);
+  });
+
   socket.on('place_bid', ({ bidValue }, callback) => {
     const roomId = playerRooms.get(socket.id);
     const room = getRoom(roomId);
@@ -249,7 +279,8 @@ io.on('connection', (socket) => {
       pickerName: picker?.name || 'A player',
       trumpTeam: result.trump?.trumpTeam,
     });
-    emitGameState(roomId);
+    const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+    emitGameState(roomId, extra);
   });
 
   // ── DECLARE BLIND TRUMP ───────────────────────
@@ -266,7 +297,8 @@ io.on('connection', (socket) => {
       trumpTeam: result.trump?.trumpTeam,
       message: 'Blind trump declared! Trump suit hidden until first trump played.',
     });
-    emitGameState(roomId);
+    const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+    emitGameState(roomId, extra);
   });
 
   // ── PLAY CARD ─────────────────────────────────
@@ -369,7 +401,8 @@ io.on('connection', (socket) => {
     if (result.error) return callback(result);
 
     callback({ success: true });
-    emitGameState(roomId);
+    const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+    emitGameState(roomId, extra);
   });
 
   // ── REQUEST HAND ──────────────────────────────
