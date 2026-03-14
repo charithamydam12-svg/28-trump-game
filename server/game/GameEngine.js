@@ -454,6 +454,12 @@ class GameEngine {
         if (hasLeadSuit && card.suit !== rs.leadSuit) {
           return this._error(`Must follow lead suit: ${rs.leadSuit}`);
         }
+        // ── Reserved trump rule: if picker has no lead suit AND reserved trump exists,
+        //    they MUST play the reserved trump card, not any other trump card ──
+        const reserved = rs.reservedTrumpCard;
+        if (!hasLeadSuit && reserved && reserved.playerId === playerId) {
+          return this._error('You must play your reserved trump card');
+        }
       }
     }
 
@@ -797,11 +803,12 @@ class GameEngine {
       : null;
 
     // Can picker play their reserved trump card right now?
-    // Yes if: trump still hidden, it's their turn, trick in progress, no lead-suit cards in normal hand
     let canPlayReservedTrump = false;
+    let mustPlayReservedTrump = false;
     if (myReservedTrump && !rs.trumpRevealed && rs.phase === 'PLAYING' && rs.currentTurnPlayerId === playerId && rs.currentTrick.length > 0) {
       const hasLeadSuit = (rs.hands[playerId] || []).some(c => c.suit === rs.leadSuit);
       canPlayReservedTrump = !hasLeadSuit;
+      mustPlayReservedTrump = !hasLeadSuit; // MUST play reserved trump, not any other card
     }
 
     return {
@@ -811,8 +818,9 @@ class GameEngine {
         suit: trumpSuit,
         iKnowTrump: knowsTrump && rs.trumpSuit !== null,
         canPickTrump,
-        myReservedTrump,       // the actual card object, only for picker
-        canPlayReservedTrump,  // whether picker can play it now
+        myReservedTrump,
+        canPlayReservedTrump,
+        mustPlayReservedTrump, // client uses this to grey out all other cards
       },
     };
   }

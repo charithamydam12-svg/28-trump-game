@@ -152,7 +152,12 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
             }}>
               ⭐ YOUR TURN — Play a card
             </div>
-            {gs.mustPlayTrump === playerId && myHand.some(c => c.suit === gs.trump?.suit) && (
+            {gs.trump?.mustPlayReservedTrump && (
+              <div style={{ textAlign: 'center', color: '#e74c3c', fontSize: 12, marginBottom: 6, fontWeight: 'bold' }}>
+                ⚠️ No lead suit — you must play your reserved trump card!
+              </div>
+            )}
+            {gs.mustPlayTrump === playerId && myHand.some(c => c.suit === gs.trump?.suit) && !gs.trump?.mustPlayReservedTrump && (
               <div style={{ textAlign: 'center', color: '#e74c3c', fontSize: 12, marginBottom: 6, fontWeight: 'bold' }}>
                 ⚠️ You showed trump — must play a trump card {SUIT_SYMBOLS[gs.trump?.suit]}
               </div>
@@ -169,19 +174,19 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
             <PlayingCard
               key={card.id}
               card={card}
-              playable={isMyTurn}
+              playable={isMyTurn && !gs.trump?.mustPlayReservedTrump}
               leadSuit={gs.leadSuit}
               hand={myHand}
               mustPlayTrump={gs.mustPlayTrump === playerId ? gs.trump?.suit : null}
-              onClick={() => isMyTurn && onPlayCard(card.id)}
+              onClick={() => isMyTurn && !gs.trump?.mustPlayReservedTrump && onPlayCard(card.id)}
             />
           ))}
 
           {/* Reserved trump card — only picker sees this */}
           {gs.trump?.myReservedTrump && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <div style={{ fontSize: 10, color: '#d4af37', letterSpacing: 1, textTransform: 'uppercase' }}>
-                🔒 Trump
+              <div style={{ fontSize: 10, color: gs.trump.mustPlayReservedTrump ? '#e74c3c' : '#d4af37', letterSpacing: 1, textTransform: 'uppercase', fontWeight: gs.trump.mustPlayReservedTrump ? 'bold' : 'normal' }}>
+                {gs.trump.mustPlayReservedTrump ? '⚠️ PLAY THIS' : '🔒 Trump'}
               </div>
               <PlayingCard
                 card={gs.trump.myReservedTrump}
@@ -191,7 +196,12 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
                 onClick={() => gs.trump.canPlayReservedTrump && onPlayCard(gs.trump.myReservedTrump.id)}
                 dimmed={!gs.trump.canPlayReservedTrump}
               />
-              {!gs.trump.canPlayReservedTrump && (
+              {gs.trump.mustPlayReservedTrump && (
+                <div style={{ fontSize: 10, color: '#e74c3c', textAlign: 'center', maxWidth: 70, fontWeight: 'bold' }}>
+                  Must play!
+                </div>
+              )}
+              {!gs.trump.canPlayReservedTrump && !gs.trump.mustPlayReservedTrump && (
                 <div style={{ fontSize: 10, color: '#4a6a8a', textAlign: 'center', maxWidth: 64 }}>
                   reserved
                 </div>
