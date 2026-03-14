@@ -6,6 +6,7 @@ export default function BiddingScreen({
   gameState, myHand, playerId,
   onLosingTeamResponse, onPlaceBid, onPassBid, onPlaceBidJohn,
   onSelectTrump, onDeclareBlindTrump, onRespondMidgameJohn,
+  isHost, onExitGame, onEndGame,
 }) {
   const [customBid, setCustomBid] = useState('');
   const gs = gameState;
@@ -36,6 +37,13 @@ export default function BiddingScreen({
       background: 'radial-gradient(ellipse at center, #0d2137 0%, #0a1628 70%)',
       padding: 24,
     }}>
+      {/* Top-right exit buttons */}
+      <div style={{ position: 'fixed', top: 12, right: 12, display: 'flex', gap: 8, zIndex: 999 }}>
+        {isHost && (
+          <button onClick={onEndGame} style={topBtn('#c0392b')}>✕ End Game</button>
+        )}
+        <button onClick={onExitGame} style={topBtn('#4a6a8a')}>🚪 Exit</button>
+      </div>
       <div style={{ textAlign: 'center', marginBottom: 20, marginTop: 16 }}>
         <div style={{ color: GOLD, fontSize: 22, fontWeight: 'bold', letterSpacing: 2 }}>Game {gs.gameNumber}</div>
         <div style={{ color: '#6b8aaa', fontSize: 13, marginTop: 4 }}>
@@ -363,3 +371,9 @@ function getQuickBids(currentBid, isFirstBid) {
   for (let i = start; i >= Math.max(0, start - 5); i--) bids.push(i);
   return bids;
 }
+
+const topBtn = (color) => ({
+  padding: '6px 14px', borderRadius: 8, border: 'none',
+  background: color, color: '#fff', cursor: 'pointer',
+  fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5,
+});

@@ -501,10 +501,10 @@ class GameEngine {
 
     rs.currentTrick.push({ playerId, card });
 
-    if (rs.currentTrick.length === 4) return { ...this._completeTrick(), trumpJustRevealed };
+    if (rs.currentTrick.length === 4) return { ...this._completeTrick(), trumpJustRevealed, playedCard: card };
 
     rs.currentTurnPlayerId = this._getNextPlayer(playerId);
-    return { ...this._getPublicState(), trumpJustRevealed };
+    return { ...this._getPublicState(), trumpJustRevealed, playedCard: card };
   }
 
   _completeTrick() {

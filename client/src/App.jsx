@@ -161,11 +161,14 @@ function GameApp() {
           players={gs.players}
           isHost={isHost}
           onNextRound={handleNextRound}
+          onExitGame={() => { socket.exitRoom(); setScreen('HOME'); }}
+          onEndGame={() => socket.endGame()}
         />
       );
     }
 
     if (BIDDING_PHASES.includes(gs.phase)) {
+      const amHost = gs.players?.find(p => p.id === socket.playerId)?.position === 0;
       return (
         <BiddingScreen
           gameState={gs} myHand={socket.myHand} playerId={socket.playerId}
@@ -174,6 +177,9 @@ function GameApp() {
           onPlaceBidJohn={socket.placeBidJohn}
           onRespondMidgameJohn={socket.respondMidgameJohn}
           onSelectTrump={socket.selectTrump} onDeclareBlindTrump={socket.declareBlindTrump}
+          isHost={amHost}
+          onExitGame={() => { socket.exitRoom(); setScreen('HOME'); }}
+          onEndGame={() => socket.endGame()}
         />
       );
     }
@@ -275,7 +281,10 @@ function GameApp() {
       )}
       {screen === 'LOBBY' && socket.lobbyState && (
         <LobbyScreen lobby={socket.lobbyState} playerId={socket.playerId}
-          onSwapTeam={socket.swapTeam} onStartGame={handleStartGame} />
+          onSwapTeam={socket.swapTeam} onStartGame={handleStartGame}
+          onExitRoom={() => { socket.exitRoom(); setScreen('HOME'); }}
+          onEndGame={() => { socket.endGame(); setScreen('HOME'); }}
+        />
       )}
       {screen === 'LOBBY' && !socket.lobbyState && (
         <div style={{

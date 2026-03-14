@@ -4,7 +4,7 @@ const GOLD = '#d4af37';
 // ─────────────────────────────────────────────────────────────
 // ROUND RESULT SCREEN
 // ─────────────────────────────────────────────────────────────
-export default function RoundResultScreen({ result, players, isHost, onNextRound }) {
+export default function RoundResultScreen({ result, players, isHost, onNextRound, onExitGame, onEndGame }) {
   const {
     roundPoints, target, trumpTeam, opponentTeam,
     roundWinner, matchPointsAwarded, matchScore,
@@ -17,6 +17,13 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
   if (isDraw) {
     return (
       <div style={overlayStyle}>
+        {/* Top-right exit buttons */}
+        <div style={{ position: 'fixed', top: 12, right: 12, display: 'flex', gap: 8, zIndex: 999 }}>
+          {isHost && (
+            <button onClick={onEndGame} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#c0392b', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 'bold' }}>✕ End Game</button>
+          )}
+          <button onClick={onExitGame} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#4a6a8a', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 'bold' }}>🚪 Exit</button>
+        </div>
         <div style={cardStyle}>
           <div style={{ color: GOLD, fontSize: 13, letterSpacing: 3, marginBottom: 8, textTransform: 'uppercase' }}>
             Round Over
@@ -62,6 +69,13 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
 
   return (
     <div style={overlayStyle}>
+      {/* Top-right exit buttons */}
+      <div style={{ position: 'fixed', top: 12, right: 12, display: 'flex', gap: 8, zIndex: 999 }}>
+        {isHost && (
+          <button onClick={onEndGame} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#c0392b', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 'bold' }}>✕ End Game</button>
+        )}
+        <button onClick={onExitGame} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#4a6a8a', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 'bold' }}>🚪 Exit</button>
+      </div>
       <div style={cardStyle}>
         <div style={{ color: GOLD, fontSize: 13, letterSpacing: 3, marginBottom: 8, textTransform: 'uppercase' }}>
           Round Over

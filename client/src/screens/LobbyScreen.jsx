@@ -4,7 +4,7 @@ const GOLD = '#d4af37';
 const TEAM_A = '#3498db';
 const TEAM_B = '#e74c3c';
 
-export default function LobbyScreen({ lobby, playerId, onSwapTeam, onStartGame }) {
+export default function LobbyScreen({ lobby, playerId, onSwapTeam, onStartGame, onExitRoom, onEndGame }) {
   const { roomId, hostId, players, canStart } = lobby;
   const isHost = playerId === hostId;
 
@@ -18,6 +18,13 @@ export default function LobbyScreen({ lobby, playerId, onSwapTeam, onStartGame }
       background: `radial-gradient(ellipse at center, #0d2137 0%, #0a1628 70%)`,
       padding: 24,
     }}>
+      {/* Top-right exit buttons */}
+      <div style={{ position: 'fixed', top: 12, right: 12, display: 'flex', gap: 8, zIndex: 999 }}>
+        {isHost && (
+          <button onClick={onEndGame} style={topBtn('#c0392b')}>✕ End Game</button>
+        )}
+        <button onClick={onExitRoom} style={topBtn('#4a6a8a')}>🚪 Exit</button>
+      </div>
       {/* Room code */}
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div style={{ color: '#6b8aaa', fontSize: 13, letterSpacing: 2, textTransform: 'uppercase' }}>
@@ -156,3 +163,9 @@ const outlineBtn = {
   border: '1px solid #d4af37', fontSize: 16, fontWeight: 'bold',
   cursor: 'pointer', fontFamily: 'Georgia, serif',
 };
+
+const topBtn = (color) => ({
+  padding: '6px 14px', borderRadius: 8, border: 'none',
+  background: color, color: '#fff', cursor: 'pointer',
+  fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5,
+});

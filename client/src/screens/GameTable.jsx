@@ -485,13 +485,17 @@ function TrickScore({ team, count, color }) {
 
 // Order players: [me, left, opposite, right]
 function getTableOrder(players, myId) {
-  const myIndex = players.findIndex((p) => p.id === myId);
-  if (myIndex === -1) return players;
-  const ordered = [];
-  for (let i = 0; i < 4; i++) {
-    ordered.push(players[(myIndex + i) % 4]);
-  }
-  return ordered;
+  const me = players.find(p => p.id === myId);
+  if (!me) return players;
+
+  const myTeam = me.team;
+  // Teammate = same team, not me
+  const teammate = players.find(p => p.team === myTeam && p.id !== myId);
+  // Opponents = other team
+  const opponents = players.filter(p => p.team !== myTeam);
+
+  // Layout: [0]=me(bottom), [1]=left opponent, [2]=teammate(top), [3]=right opponent
+  return [me, opponents[0], teammate, opponents[1]];
 }
 
 const SUIT_SYMBOLS = {

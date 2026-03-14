@@ -310,21 +310,21 @@ io.on('connection', (socket) => {
     const result = room.playCard(socket.id, cardId);
     if (result.error) return callback(result);
 
-    callback({ success: true });
-
-    // Only broadcast trump_revealed when it JUST flipped to true this move
-    const gs = room.getGameState();
-    if (result.trumpJustRevealed && gs?.trump?.suit) {
+    // Emit trump_revealed BEFORE callback so all players (including picker) see the flash
+    const rs = room.engine?.roundState;
+    if (result.trumpJustRevealed && rs?.trumpSuit) {
       const sym = { spades:'♠', hearts:'♥', diamonds:'♦', clubs:'♣' };
       const player = room.players.find(p => p.id === socket.id);
-      const rs = room.engine?.roundState;
+      const playedCard = result.playedCard || rs.trumpCard || rs.blindTrumpCard || null;
       io.to(roomId).emit('trump_revealed', {
-        suit: gs.trump.suit,
-        symbol: sym[gs.trump.suit],
+        suit: rs.trumpSuit,
+        symbol: sym[rs.trumpSuit],
         playedBy: player?.name || 'A player',
-        card: rs?.trumpCard || rs?.blindTrumpCard || null,
+        card: playedCard,
       });
     }
+
+    callback({ success: true });
 
     if (result.trickResult) {
       // Phase is now TRICK_RESULT — emit state WITH all 4 cards visible
