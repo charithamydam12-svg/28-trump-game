@@ -339,7 +339,7 @@ io.on('connection', (socket) => {
         if (!advResult) return;
         const extra = advResult.roundResult ? { roundResult: advResult.roundResult } : {};
         emitGameState(roomId, extra);
-      }, 2000);
+      }, 5000); // 5s trick display delay
     } else {
       const extra = result.roundResult ? { roundResult: result.roundResult } : {};
       emitGameState(roomId, extra);

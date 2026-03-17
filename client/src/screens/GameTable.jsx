@@ -9,7 +9,7 @@ const SUIT_COLORS = {
   spades: '#fff', clubs: '#fff',
 };
 
-export default function GameTable({ gameState, myHand, playerId, onPlayCard, onRequestMyTrump, isHost, onEndGame, onExitGame, trumpRevealFlash }) {
+export default function GameTable({ gameState, myHand, playerId, onPlayCard, onRequestMyTrump, isHost, onEndGame, onExitGame, trumpRevealFlash, connected }) {
   const gs = gameState;
   const [myRevealedTrump, setMyRevealedTrump] = React.useState(null);
 
@@ -84,22 +84,29 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
                     : 'No trump yet'}
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-          <ScorePill team="B" score={gs.matchScore.B} color="#e74c3c" />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div title={connected ? 'Connected' : 'Connecting...'} style={{
+              width: 9, height: 9, borderRadius: '50%',
+              background: connected ? '#27ae60' : '#e74c3c',
+              boxShadow: connected ? '0 0 6px #27ae60' : '0 0 6px #e74c3c',
+            }} />
+            <ScorePill team="B" score={gs.matchScore.B} color="#e74c3c" />
+          </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {isHost && (
               <button onClick={onEndGame} style={{
-                padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(192,57,43,0.6)',
+                padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(192,57,43,0.6)',
                 background: 'rgba(192,57,43,0.15)', color: '#e74c3c', cursor: 'pointer',
-                fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5,
+                fontSize: 10, fontWeight: 'bold',
               }}>
-                ✕ End Game
+                ✕ End
               </button>
             )}
             <button onClick={onExitGame} style={{
-              padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(74,106,138,0.6)',
+              padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(74,106,138,0.6)',
               background: 'rgba(74,106,138,0.15)', color: '#7f8c8d', cursor: 'pointer',
-              fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5,
+              fontSize: 10, fontWeight: 'bold',
             }}>
               🚪 Exit
             </button>
@@ -111,20 +118,20 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
 
         {/* Top player */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0 0' }}>
-          <PlayerSeat player={orderedPlayers[2]} isCurrentTurn={gs.currentTurnPlayerId === orderedPlayers[2]?.id} />
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}>
+          <PlayerSeat player={orderedPlayers[2]} isCurrentTurn={gs.currentTurnPlayerId === orderedPlayers[2]?.id} isTrumpPicker={gs.trump?.trumpPickerPlayerId === orderedPlayers[2]?.id} />
         </div>
 
         {/* Middle row: left player, felt table, right player */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px' }}>
-          <PlayerSeat player={orderedPlayers[1]} isCurrentTurn={gs.currentTurnPlayerId === orderedPlayers[1]?.id} vertical />
-          <FeltTable gs={gs} />
-          <PlayerSeat player={orderedPlayers[3]} isCurrentTurn={gs.currentTurnPlayerId === orderedPlayers[3]?.id} vertical />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px' }}>
+          <PlayerSeat player={orderedPlayers[1]} isCurrentTurn={gs.currentTurnPlayerId === orderedPlayers[1]?.id} vertical isTrumpPicker={gs.trump?.trumpPickerPlayerId === orderedPlayers[1]?.id} />
+          <FeltTable gs={gs} orderedPlayers={orderedPlayers} />
+          <PlayerSeat player={orderedPlayers[3]} isCurrentTurn={gs.currentTurnPlayerId === orderedPlayers[3]?.id} vertical isTrumpPicker={gs.trump?.trumpPickerPlayerId === orderedPlayers[3]?.id} />
         </div>
 
         {/* Bottom: my info */}
-        <div style={{ padding: '0 12px 4px', display: 'flex', justifyContent: 'center' }}>
-          <PlayerSeat player={orderedPlayers[0]} isCurrentTurn={isMyTurn} isMe />
+        <div style={{ padding: '0 8px 2px', display: 'flex', justifyContent: 'center' }}>
+          <PlayerSeat player={orderedPlayers[0]} isCurrentTurn={isMyTurn} isMe isTrumpPicker={gs.trump?.trumpPickerPlayerId === orderedPlayers[0]?.id} />
         </div>
       </div>
 
@@ -134,16 +141,6 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
         padding: '16px 20px 24px',
         position: 'relative', zIndex: 10,
       }}>
-        {gs.phase === 'TRICK_RESULT' && gs.lastTrickWinner && (
-          <div style={{
-            textAlign: 'center', marginBottom: 10, padding: '6px 16px',
-            background: 'rgba(212,175,55,0.15)', borderRadius: 10,
-            border: '1px solid rgba(212,175,55,0.4)',
-            color: GOLD, fontWeight: 'bold', fontSize: 14, letterSpacing: 1,
-          }}>
-            🏆 {gs.players?.find(p => p.id === gs.lastTrickWinner)?.name} wins the trick!
-          </div>
-        )}
         {gs.phase === 'PLAYING' && isMyTurn && (
           <>
             <div style={{
@@ -273,7 +270,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
             background: 'rgba(10,22,40,0.92)', border: `2px solid ${['hearts', 'diamonds'].includes(trumpRevealFlash.suit) ? '#e74c3c' : '#d4af37'}`,
             borderRadius: 20, padding: '24px 40px', textAlign: 'center',
             boxShadow: '0 8px 40px rgba(0,0,0,0.7)',
-            animation: 'fadeInOut 3.5s ease forwards',
+            animation: 'fadeInOut 5s ease forwards',
           }}>
             <div style={{ color: '#7f8c8d', fontSize: 12, letterSpacing: 2, marginBottom: 8 }}>TRUMP CARD</div>
             <div style={{
@@ -286,7 +283,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
               {trumpRevealFlash.playedBy} revealed trump
             </div>
           </div>
-          <style>{`@keyframes fadeInOut { 0%{opacity:0;transform:scale(0.8)} 15%{opacity:1;transform:scale(1)} 75%{opacity:1} 100%{opacity:0;transform:scale(0.9)} }`}</style>
+          <style>{`@keyframes fadeInOut { 0%{opacity:0;transform:scale(0.8)} 10%{opacity:1;transform:scale(1)} 80%{opacity:1} 100%{opacity:0;transform:scale(0.9)} }`}</style>
         </div>,
         document.body
       )}
@@ -296,44 +293,73 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
 }
 
 // ─── FELT TABLE CENTER ───────────────────────────────────────
-function FeltTable({ gs }) {
+function FeltTable({ gs, orderedPlayers }) {
+  // Map each player's position to a table slot:
+  // orderedPlayers[0]=me(bottom), [1]=left, [2]=top, [3]=right
+  const slotForPlayer = {};
+  if (orderedPlayers[0]) slotForPlayer[orderedPlayers[0].id] = 'bottom';
+  if (orderedPlayers[1]) slotForPlayer[orderedPlayers[1].id] = 'left';
+  if (orderedPlayers[2]) slotForPlayer[orderedPlayers[2].id] = 'top';
+  if (orderedPlayers[3]) slotForPlayer[orderedPlayers[3].id] = 'right';
+
+  const cardsBySlot = {};
+  (gs.currentTrick || []).forEach(({ playerId, card }) => {
+    const slot = slotForPlayer[playerId] || 'center';
+    cardsBySlot[slot] = card;
+  });
+
+  const cardPos = {
+    top: { top: 8, left: '50%', transform: 'translateX(-50%)' },
+    bottom: { bottom: 8, left: '50%', transform: 'translateX(-50%)' },
+    left: { left: 8, top: '50%', transform: 'translateY(-50%)' },
+    right: { right: 8, top: '50%', transform: 'translateY(-50%)' },
+  };
+
   return (
     <div style={{
-      width: 240, height: 200, borderRadius: 30,
+      flex: 1, maxWidth: 340, height: 260,
+      borderRadius: 32,
       background: `radial-gradient(ellipse, #1e5c3a, ${FELT})`,
       border: '6px solid #2d6b45',
-      boxShadow: 'inset 0 0 40px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.5)',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', position: 'relative',
+      boxShadow: 'inset 0 0 50px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.5)',
+      position: 'relative', margin: '0 4px',
     }}>
-      {/* Trick score display */}
-      <div style={{ position: 'absolute', top: 10, display: 'flex', gap: 16 }}>
-        <TrickScore team="A" count={gs.trickCounts?.A || 0} color="#3498db" />
-        <TrickScore team="B" count={gs.trickCounts?.B || 0} color="#e74c3c" />
-      </div>
+      {/* SA left side, SB right side */}
+      <TrickScore team="A" count={gs.trickCounts?.A || 0} color="#3498db" side="left" />
+      <TrickScore team="B" count={gs.trickCounts?.B || 0} color="#e74c3c" side="right" />
 
-      {/* Played cards in current trick */}
-      {gs.currentTrick.length > 0 ? (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-          {gs.currentTrick.map(({ playerId, card }) => (
-            <div key={card.id} style={{ animation: 'cardPlay 0.3s ease' }}>
-              <TableCard card={card} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, textAlign: 'center' }}>
-          {gs.trickCount >= 7 ? 'Round Complete!' : `Trick ${(gs.trickCount || 0) + 1} of 7`}
+      {/* Cards at 4 positions */}
+      {['top', 'bottom', 'left', 'right'].map(slot => (
+        cardsBySlot[slot] ? (
+          <div key={slot} style={{ position: 'absolute', ...cardPos[slot], zIndex: 3, animation: 'cardPlay 0.3s ease' }}>
+            <TableCard card={cardsBySlot[slot]} />
+          </div>
+        ) : null
+      ))}
+
+      {/* Empty state */}
+      {(gs.currentTrick || []).length === 0 && (
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'rgba(255,255,255,0.2)', fontSize: 13, textAlign: 'center', zIndex: 1 }}>
+          {gs.trickCount >= 7 ? 'Round Complete!' : `Serve ${(gs.trickCount || 0) + 1} of 7`}
         </div>
       )}
 
-      {/* Lead suit indicator */}
+      {/* Lead suit */}
       {gs.leadSuit && (
-        <div style={{
-          position: 'absolute', bottom: 10,
-          color: SUIT_COLORS[gs.leadSuit], fontSize: 20,
-        }}>
+        <div style={{ position: 'absolute', bottom: 8, right: 12, color: SUIT_COLORS[gs.leadSuit], fontSize: 18, zIndex: 2 }}>
           {SUIT_SYMBOLS[gs.leadSuit]}
+        </div>
+      )}
+
+      {/* Trick result winner banner */}
+      {gs.phase === 'TRICK_RESULT' && gs.lastTrickWinner && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          background: 'rgba(10,22,40,0.85)', border: '1px solid rgba(212,175,55,0.6)',
+          borderRadius: 10, padding: '6px 14px', color: GOLD, fontSize: 13, fontWeight: 'bold',
+          whiteSpace: 'nowrap', zIndex: 4, textAlign: 'center',
+        }}>
+          🏆 {(gs.players || []).find(p => p.id === gs.lastTrickWinner)?.name}
         </div>
       )}
     </div>
@@ -341,7 +367,7 @@ function FeltTable({ gs }) {
 }
 
 // ─── PLAYER SEAT ─────────────────────────────────────────────
-function PlayerSeat({ player, isCurrentTurn, isMe, vertical }) {
+function PlayerSeat({ player, isCurrentTurn, isMe, vertical, isTrumpPicker }) {
   if (!player) return <div style={{ width: vertical ? 60 : 120 }} />;
 
   const teamColor = player.team === 'A' ? '#3498db' : '#e74c3c';
@@ -354,12 +380,15 @@ function PlayerSeat({ player, isCurrentTurn, isMe, vertical }) {
       opacity: isOffline ? 0.6 : 1,
     }}>
       <div style={{ position: 'relative' }}>
+        {isTrumpPicker && (
+          <div style={{ position: 'absolute', top: -16, left: '50%', transform: 'translateX(-50%)', fontSize: 16, zIndex: 5, lineHeight: 1 }}>👑</div>
+        )}
         <div style={{
           width: 44, height: 44, borderRadius: '50%',
           background: teamColor, display: 'flex', alignItems: 'center',
           justifyContent: 'center', fontWeight: 'bold', fontSize: 18,
-          border: isCurrentTurn ? `3px solid ${GOLD}` : '3px solid transparent',
-          boxShadow: isCurrentTurn ? `0 0 16px ${GOLD}` : 'none',
+          border: isCurrentTurn ? `3px solid ${GOLD}` : isTrumpPicker ? '3px solid #f39c12' : '3px solid transparent',
+          boxShadow: isCurrentTurn ? `0 0 16px ${GOLD}` : isTrumpPicker ? '0 0 10px #f39c12' : 'none',
           transition: 'all 0.3s', color: '#fff',
         }}>
           {player.name[0].toUpperCase()}
@@ -474,11 +503,14 @@ function ScorePill({ team, score, color }) {
   );
 }
 
-function TrickScore({ team, count, color }) {
+function TrickScore({ team, count, color, side }) {
+  const pos = side === 'left'
+    ? { position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2 }
+    : { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2 };
   return (
-    <div style={{ color, fontSize: 13, fontWeight: 'bold', textAlign: 'center' }}>
-      <span style={{ color: '#6b8aaa', fontWeight: 'normal', fontSize: 11 }}>T{team}: </span>
-      {count}
+    <div style={{ ...pos, textAlign: 'center' }}>
+      <div style={{ color, fontSize: 22, fontWeight: 'bold', lineHeight: 1 }}>{count}</div>
+      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 2 }}>S{team}</div>
     </div>
   );
 }
@@ -488,14 +520,22 @@ function getTableOrder(players, myId) {
   const me = players.find(p => p.id === myId);
   if (!me) return players;
 
-  const myTeam = me.team;
-  // Teammate = same team, not me
-  const teammate = players.find(p => p.team === myTeam && p.id !== myId);
-  // Opponents = other team
-  const opponents = players.filter(p => p.team !== myTeam);
+  // Play order is clockwise by position: 0→1→2→3→0
+  // From my seat (bottom):
+  //   [0] = me (bottom)
+  //   [1] = left  = next player clockwise after me (position+1 % 4)
+  //   [2] = top   = teammate (position+2 % 4)
+  //   [3] = right = player before me clockwise (position+3 % 4)
+  const myPos = me.position;
+  const byPos = {};
+  players.forEach(p => { byPos[p.position] = p; });
 
-  // Layout: [0]=me(bottom), [1]=left opponent, [2]=teammate(top), [3]=right opponent
-  return [me, opponents[0], teammate, opponents[1]];
+  return [
+    byPos[myPos % 4],           // bottom = me
+    byPos[(myPos + 1) % 4],     // left   = next clockwise
+    byPos[(myPos + 2) % 4],     // top    = teammate
+    byPos[(myPos + 3) % 4],     // right  = prev clockwise
+  ];
 }
 
 const SUIT_SYMBOLS = {

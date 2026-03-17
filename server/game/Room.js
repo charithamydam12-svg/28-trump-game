@@ -67,8 +67,18 @@ class Room {
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { error: 'Player not found' };
 
+    // Switch team
     player.team = player.team === 'A' ? 'B' : 'A';
-    return { success: true, player };
+
+    // Reassign positions so teams always interleave: A=0,2 and B=1,3
+    const teamA = this.players.filter(p => p.team === 'A');
+    const teamB = this.players.filter(p => p.team === 'B');
+    [0, 1].forEach(i => {
+      if (teamA[i]) teamA[i].position = i * 2;       // A: 0, 2
+      if (teamB[i]) teamB[i].position = i * 2 + 1;   // B: 1, 3
+    });
+
+    return { success: true };
   }
 
   // ─────────────────────────────────────────────

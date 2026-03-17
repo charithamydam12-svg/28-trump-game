@@ -90,7 +90,7 @@ export function useSocket() {
       socket.on('trump_revealed', ({ symbol, suit, playedBy, card }) => {
         showNotification(`🃏 Trump revealed! ${playedBy} played ${symbol}`, 'warning');
         setTrumpRevealFlash({ suit, symbol, card, playedBy });
-        setTimeout(() => setTrumpRevealFlash(null), 3500);
+        setTimeout(() => setTrumpRevealFlash(null), 5000);
       });
 
       socket.on('trick_complete', ({ trickWinnerTeam, trickNumber }) =>

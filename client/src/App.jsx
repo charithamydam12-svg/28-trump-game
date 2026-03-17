@@ -197,21 +197,20 @@ function GameApp() {
         onEndGame={() => socket.endGame()}
         onExitGame={() => { socket.exitRoom(); setScreen('HOME'); }}
         trumpRevealFlash={socket.trumpRevealFlash}
+        connected={socket.connected}
       />
     );
   };
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a1628', fontFamily: 'Georgia, serif' }}>
+      {/* Global connection dot — top left, small, unobtrusive */}
       <div style={{
-        position: 'fixed', top: 10, right: 12, zIndex: 9999,
-        background: socket.connected ? 'rgba(39,174,96,0.2)' : 'rgba(192,57,43,0.2)',
-        border: `1px solid ${socket.connected ? '#27ae60' : '#c0392b'}`,
-        borderRadius: 20, padding: '4px 12px', fontSize: 12,
-        color: socket.connected ? '#27ae60' : '#e74c3c',
-      }}>
-        {socket.connected ? '● Connected' : '○ Connecting...'}
-      </div>
+        position: 'fixed', top: 10, left: 12, zIndex: 9999,
+        width: 10, height: 10, borderRadius: '50%',
+        background: socket.connected ? '#27ae60' : '#e74c3c',
+        boxShadow: socket.connected ? '0 0 8px #27ae60' : '0 0 8px #e74c3c',
+      }} title={socket.connected ? 'Connected' : 'Connecting...'} />
       {socket.notification && (
         <div style={{
           position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
