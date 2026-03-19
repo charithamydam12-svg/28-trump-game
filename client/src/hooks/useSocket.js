@@ -15,6 +15,7 @@ export function useSocket() {
   const [error, setError]           = useState(null);
   const [disconnectedPlayer, setDisconnectedPlayer] = useState(null);
   const [trumpRevealFlash, setTrumpRevealFlash] = useState(null);
+  const [johnDecisionFlash, setJohnDecisionFlash] = useState(null);
 
   function showNotification(message, type = 'info') {
     setNotification({ message, type, id: Date.now() });
@@ -106,6 +107,11 @@ export function useSocket() {
         setDisconnectedPlayer(null);
       });
 
+      socket.on('john_decision', ({ playerName, accepted }) => {
+        setJohnDecisionFlash({ playerName, accepted, time: Date.now() });
+        setTimeout(() => setJohnDecisionFlash(null), 4000);
+      });
+
       socket.on('game_ended', ({ message }) => {
         showNotification(message || 'Host ended the game', 'warning');
         try { localStorage.removeItem('28trump_session'); } catch(e) {}
@@ -193,6 +199,7 @@ export function useSocket() {
     notification, error,
     disconnectedPlayer, setDisconnectedPlayer,
     trumpRevealFlash,
+    johnDecisionFlash,
     createRoom, joinRoom, swapTeam, startGame, requestMyTrump,
     losingTeamResponse, placeBid, passBid, placeBidJohn, respondMidgameJohn,
     selectTrump, declareBlindTrump, playCard, nextRound, exitRoom, endGame,

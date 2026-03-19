@@ -56,6 +56,7 @@ function GameApp() {
 
   const gs = socket.gameState;
   const { disconnectedPlayer, setDisconnectedPlayer, exitRoom } = socket;
+  const johnFlash = socket.johnDecisionFlash;
 
   useEffect(() => {
     if (socket.lobbyState) {
@@ -220,6 +221,31 @@ function GameApp() {
           fontWeight: 'bold', zIndex: 9998, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
         }}>
           {socket.notification.message}
+        </div>
+      )}
+
+      {/* John decision flash popup */}
+      {johnFlash && (
+        <div style={{
+          position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 11000, pointerEvents: 'none',
+        }}>
+          <div style={{
+            background: 'rgba(10,22,40,0.93)',
+            border: `2px solid ${johnFlash.accepted ? '#f39c12' : '#4a6a8a'}`,
+            borderRadius: 20, padding: '24px 40px', textAlign: 'center',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.7)',
+            animation: 'fadeInOut 4s ease forwards',
+          }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>{johnFlash.accepted ? '🃏' : '🤚'}</div>
+            <div style={{ color: johnFlash.accepted ? '#f39c12' : '#7f8c8d', fontWeight: 'bold', fontSize: 20, marginBottom: 6 }}>
+              {johnFlash.accepted ? 'JOHN!' : 'Skip'}
+            </div>
+            <div style={{ color: '#ccc', fontSize: 14 }}>
+              {johnFlash.playerName} {johnFlash.accepted ? 'called John — must win all 3 serves!' : 'skipped John'}
+            </div>
+          </div>
+          <style>{`@keyframes fadeInOut { 0%{opacity:0;transform:scale(0.8)} 10%{opacity:1;transform:scale(1)} 80%{opacity:1} 100%{opacity:0;transform:scale(0.9)} }`}</style>
         </div>
       )}
 

@@ -204,8 +204,8 @@ class Room {
   }
 
   _generateCode() {
-    // 6-char uppercase room code (easy to share with family)
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    // 4-digit numeric room code
+    return String(Math.floor(1000 + Math.random() * 9000));
   }
 }
 

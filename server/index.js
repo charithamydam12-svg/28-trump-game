@@ -147,7 +147,7 @@ io.on('connection', (socket) => {
   // ── JOIN ROOM ─────────────────────────────────
   socket.on('join_room', ({ roomId, playerName }, callback) => {
     try {
-      const room = getRoom(roomId.toUpperCase());
+      const room = getRoom(roomId.trim());
       if (!room) return callback({ error: 'Room not found' });
       if (room.status === 'PLAYING') return callback({ error: 'Game already started' });
 
@@ -155,12 +155,12 @@ io.on('connection', (socket) => {
       if (result.error) return callback(result);
 
       result.player.socketId = socket.id;
-      playerRooms.set(socket.id, roomId.toUpperCase());
-      socket.join(roomId.toUpperCase());
+      playerRooms.set(socket.id, roomId.trim());
+      socket.join(roomId.trim());
 
       console.log(`👤 ${playerName} joined room ${roomId}`);
-      callback({ success: true, roomId: roomId.toUpperCase(), playerId: socket.id, persistentId: result.player.persistentId });
-      emitLobby(roomId.toUpperCase());
+      callback({ success: true, roomId: roomId.trim(), playerId: socket.id, persistentId: result.player.persistentId });
+      emitLobby(roomId.trim());
     } catch (e) {
       callback({ error: e.message });
     }
@@ -235,6 +235,14 @@ io.on('connection', (socket) => {
     const result = room.respondMidgameJohn(socket.id, acceptJohn);
     if (result.error) return callback(result);
     callback({ success: true });
+
+    // Notify all players of the John decision
+    const player = room.players.find(p => p.id === socket.id);
+    io.to(roomId).emit('john_decision', {
+      playerName: player?.name || 'A player',
+      accepted: acceptJohn,
+    });
+
     emitGameState(roomId);
   });
 

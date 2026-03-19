@@ -48,16 +48,19 @@ class GameEngine {
       phase: PHASE.DEAL_FIRST_FOUR,
       deck, hands, remaining,
 
-      // Individual bidding — each player bids separately
-      // bids: { playerId: number }  (only set when player bids, not when they pass)
-      playerBids: {},          // { playerId: bidValue }
-      passedPlayers: new Set(), // players who passed
+      // Team-based bidding
+      teamBids: {},            // { 'A': bidValue, 'B': bidValue }
+      teamPassVotes: { A: new Set(), B: new Set() }, // players who voted pass per team
       currentBid: 21,
-      bidderTurnIndex: 0,      // index into this.players array
+      biddingTeam: 'A',        // which team's turn it is to bid
       biddingComplete: false,
-      winnerPlayerId: null,    // player who won the bid
+      winnerPlayerId: null,
       winnerTeam: null,
       targetBid: null,
+      // legacy compat
+      playerBids: {},
+      passedPlayers: new Set(),
+      bidderTurnIndex: 0,
 
       // Trump — hidden from all except winner
       trumpSuit: null,
@@ -81,12 +84,16 @@ class GameEngine {
 
     if (this.gameNumber === 1) {
       this.roundState.phase = PHASE.BIDDING;
-      this.roundState.bidderTurnIndex = 0;
+      this.roundState.biddingTeam = 'A'; // Team A bids first in game 1
     } else {
+      // Game 2+: winning team bids first at 21, losing team starts from 20
       const losingTeam = this._getLosingTeam();
-      this.roundState.phase = PHASE.ASK_LOSING_TEAM;
+      const winningTeam = losingTeam === 'A' ? 'B' : 'A';
+      this.roundState.phase = PHASE.BIDDING;
+      this.roundState.biddingTeam = winningTeam; // winning team bids first
       this.roundState.losingTeam = losingTeam;
-      this.roundState.higherScoreTeam = losingTeam === 'A' ? 'B' : 'A';
+      this.roundState.higherScoreTeam = winningTeam;
+      this.roundState.winningTeamBidFirst = true; // flag: winning team gets 21, losing starts at 20
     }
 
     // ── Rule A: if any player has all 4 zero-point cards → draw ──
@@ -102,166 +109,176 @@ class GameEngine {
     return this._getPublicState();
   }
 
-  // ─── LOSING TEAM RESPONSE (Game 2+) ──────────────────────
-  // Rule: ANY player clicking YES starts bidding immediately
-  //       BOTH players must click NO to force trump on winning team
-  losingTeamResponse(playerId, wantsToBid) {
-    const rs = this.roundState;
-    if (rs.phase !== PHASE.ASK_LOSING_TEAM) return this._error('Wrong phase');
+  // ─── TEAM BIDDING ────────────────────────────────────────
+  // New rule: teams bid as a unit. Each team has a "current bid slot".
+  // A team bids by ONE player clicking a bid value.
+  // A team passes by BOTH players clicking pass.
+  // Bid goes down by exactly 1 each turn (or John=16).
+  // After opponent bids X, your team can only bid X-1 (or John=16).
 
-    const player = this.playerMap[playerId];
-    if (!player || player.team !== rs.losingTeam) return this._error('Not on the losing team');
-
-    // Track individual responses
-    if (!rs.losingTeamResponses) rs.losingTeamResponses = {};
-    rs.losingTeamResponses[playerId] = wantsToBid;
-
-    if (wantsToBid) {
-      // Any YES → start bidding immediately, this player bids first
-      rs.phase = PHASE.BIDDING;
-      rs.bidderTurnIndex = this.players.indexOf(player);
-    } else {
-      // Check if ALL losing team players have said NO
-      const losingTeamPlayers = this.players.filter(p => p.team === rs.losingTeam);
-      const allSaidNo = losingTeamPlayers.every(p => rs.losingTeamResponses[p.id] === false);
-
-      if (allSaidNo) {
-        // Both said NO → winning team forced to bid 21, BOTH can pick trump
-        rs.phase = PHASE.TRUMP_SELECTION;
-        rs.winnerTeam = rs.higherScoreTeam;
-        rs.trumpTeam = rs.higherScoreTeam;
-        rs.targetBid = 21;
-        rs.biddingComplete = true;
-        rs.forcedTrump = true;
-        // trumpPickerPlayerId = null means ANY winning team player can pick
-        rs.trumpPickerPlayerId = null;
-        rs.winnerPlayerId = null;
-      }
-      // else: waiting for the other losing team player to respond
-    }
-    return this._getPublicState();
-  }
-
-  // ─── PLACE BID (individual player) ───────────────────────
   placeBid(playerId, bidValue) {
     const rs = this.roundState;
     if (rs.phase !== PHASE.BIDDING) return this._error('Not in bidding phase');
 
-    const currentBidder = this.players[rs.bidderTurnIndex];
-    if (currentBidder.id !== playerId) return this._error('Not your turn to bid');
-    if (bidValue < 0) return this._error('Bid cannot be negative');
+    const player = this.playerMap[playerId];
+    if (!player) return this._error('Player not found');
+    if (player.team !== rs.biddingTeam) return this._error("Not your team's turn to bid");
 
-    const isFirstBid = Object.keys(rs.playerBids).length === 0;
-    if (isFirstBid  && bidValue > rs.currentBid)  return this._error(`Opening bid cannot exceed ${rs.currentBid}`);
-    if (!isFirstBid && bidValue >= rs.currentBid) return this._error(`Bid must be lower than ${rs.currentBid}`);
+    // Validate bid value
+    const losingTeam = rs.losingTeam;
+    const winningTeam = rs.higherScoreTeam;
+    const isWinningTeam = winningTeam && player.team === winningTeam;
+    const isLosingTeam = losingTeam && player.team === losingTeam;
 
-    rs.playerBids[playerId] = bidValue;
+    // Determine valid bid range
+    // First bid of entire auction: winning team can bid 21, losing team starts at 20
+    const noBidsYet = Object.keys(rs.teamBids).length === 0;
+
+    if (noBidsYet) {
+      // First bid is always 21 (or 20 for losing team in game 2+)
+      if (rs.winningTeamBidFirst) {
+        const maxFirst = (losingTeam && player.team === losingTeam) ? 20 : 21;
+        if (bidValue !== maxFirst) return this._error(`First bid must be exactly ${maxFirst}`);
+      } else {
+        if (bidValue !== 21) return this._error('First bid must be exactly 21');
+      }
+    } else {
+      // Subsequent bids must be exactly currentBid - 1 (or John=16 handled separately)
+      if (bidValue !== rs.currentBid - 1) {
+        return this._error(`Must bid exactly ${rs.currentBid - 1}`);
+      }
+    }
+
+    rs.teamBids[player.team] = bidValue;
+    rs.playerBids[playerId] = bidValue; // legacy compat
     rs.currentBid = bidValue;
 
-    // If John was active and someone bids ≤15 → John cancelled
-    if (rs.johnActive && playerId !== rs.johnPlayerId) {
+    // Cancel John if opponent bids <= 15
+    if (rs.johnActive && player.team !== rs.johnTeam) {
       rs.johnActive = false;
       rs.johnPlayerId = null;
+      rs.johnTeam = null;
     }
 
-    if (bidValue === 0) {
-      return this._endBidding(playerId);
-    }
+    if (bidValue === 0) return this._endBidding(playerId);
 
-    // If all other players have already passed, this player wins immediately
-    const activePlayers = this.players.filter(p => !rs.passedPlayers.has(p.id));
-    if (activePlayers.length === 1 && activePlayers[0].id === playerId) {
-      return this._endBidding(playerId);
-    }
+    // Switch to other team's turn
+    rs.biddingTeam = player.team === 'A' ? 'B' : 'A';
+    rs.teamPassVotes[rs.biddingTeam] = new Set(); // reset pass votes
+    // Clear next team's old bid so they can bid again
+    delete rs.teamBids[rs.biddingTeam];
 
-    return this._advanceBidTurn();
+    return this._getPublicState();
   }
 
-  // ─── JOHN BID (Rule A) ───────────────────────────────────
-  // John = bid at 16, wants trump. Special scoring: win=+2, lose=+4 to opponent.
-  // After John, others can still bid 15..0 (cancels John if they do).
   placeBidJohn(playerId) {
     const rs = this.roundState;
     if (rs.phase !== PHASE.BIDDING) return this._error('Not in bidding phase');
-    const currentBidder = this.players[rs.bidderTurnIndex];
-    console.log('[placeBidJohn] playerId:', playerId, 'currentBidder:', currentBidder?.id, 'index:', rs.bidderTurnIndex);
-    if (currentBidder.id !== playerId) return this._error('Not your turn to bid');
+    const player = this.playerMap[playerId];
+    if (!player) return this._error('Player not found');
+    if (player.team !== rs.biddingTeam) return this._error("Not your team's turn to bid");
     if (rs.johnPlayerId) return this._error('John already called');
 
     const JOHN_BID = 16;
-    const isFirstBid = Object.keys(rs.playerBids).length === 0;
-    // John is valid if: first bid (current is 21, 16 <= 21 ✓) OR current bid > 16
-    if (!isFirstBid && JOHN_BID >= rs.currentBid) return this._error(`John (16) needs current bid > 16, current is ${rs.currentBid}`);
+    if (rs.currentBid <= 16) return this._error('John (16) is not lower than current bid');
 
     rs.johnPlayerId = playerId;
+    rs.johnTeam = player.team;
     rs.johnActive = true;
+    rs.teamBids[player.team] = JOHN_BID;
     rs.playerBids[playerId] = JOHN_BID;
     rs.currentBid = JOHN_BID;
 
-    // If everyone else already passed → John wins immediately, go to trump selection
-    const activePlayers = this.players.filter(p => !rs.passedPlayers.has(p.id));
-    console.log('[placeBidJohn] activePlayers:', activePlayers.map(p=>p.id), 'playerId:', playerId);
-    if (activePlayers.length === 1 && activePlayers[0].id === playerId) {
-      console.log('[placeBidJohn] only active player, ending bidding');
-      return this._endBidding(playerId);
-    }
+    // Switch to opponent's turn
+    rs.biddingTeam = player.team === 'A' ? 'B' : 'A';
+    rs.teamPassVotes[rs.biddingTeam] = new Set();
+    delete rs.teamBids[rs.biddingTeam]; // clear so they can bid again
 
-    return this._advanceBidTurn();
+    // Check if opponent team already both passed
+    const oppTeam = rs.biddingTeam;
+    const oppPlayers = this.players.filter(p => p.team === oppTeam);
+    const oppBothPassed = oppPlayers.every(p => rs.teamPassVotes[oppTeam]?.has(p.id));
+    if (oppBothPassed) return this._endBidding(playerId);
+
+    return this._getPublicState();
   }
 
-  // ─── PASS BID ────────────────────────────────────────────
   passBid(playerId) {
     const rs = this.roundState;
     if (rs.phase !== PHASE.BIDDING) return this._error('Not in bidding phase');
 
-    const currentBidder = this.players[rs.bidderTurnIndex];
-    if (currentBidder.id !== playerId) return this._error('Not your turn to bid');
+    const player = this.playerMap[playerId];
+    if (!player) return this._error('Player not found');
+    if (player.team !== rs.biddingTeam) return this._error("Not your team's turn to bid");
 
-    rs.passedPlayers.add(playerId);
+    // Record this player's pass vote for their team
+    if (!rs.teamPassVotes[player.team]) rs.teamPassVotes[player.team] = new Set();
+    rs.teamPassVotes[player.team].add(playerId);
+    rs.passedPlayers.add(playerId); // legacy
 
-    const activePlayers = this.players.filter(p => !rs.passedPlayers.has(p.id));
-    const hasBids = Object.keys(rs.playerBids).length > 0;
+    const myTeamPlayers = this.players.filter(p => p.team === player.team);
+    const myTeamBothPassed = myTeamPlayers.every(p => rs.teamPassVotes[player.team].has(p.id));
 
-    console.log('[passBid]', playerId, 'active:', activePlayers.length, 'hasBids:', hasBids);
-
-    // CASE 1: All 4 passed with NO bids → host forced at 21
-    if (activePlayers.length === 0 && !hasBids) {
-      console.log('[passBid] All passed, no bids → force host');
-      const host = this.players.find(p => p.position === 0);
-      rs.phase = PHASE.TRUMP_SELECTION;
-      rs.winnerPlayerId = host.id;
-      rs.winnerTeam = host.team;
-      rs.trumpPickerPlayerId = host.id;
-      rs.trumpTeam = host.team;
-      rs.targetBid = 21;
-      rs.biddingComplete = true;
-      rs.forcedTrump = true;
-      rs.currentBid = 21;
+    if (!myTeamBothPassed) {
+      // Only one player passed — wait for teammate (stay on same team's turn but show partial pass)
       return this._getPublicState();
     }
 
-    // CASE 2: All 4 passed and someone DID bid → last bidder wins
-    if (activePlayers.length === 0 && hasBids) {
-      const lastBidder = this._getLastBidder();
-      console.log('[passBid] All passed, lastBidder wins:', lastBidder);
-      return this._endBidding(lastBidder);
-    }
+    // Both players on this team passed
+    const oppTeam = player.team === 'A' ? 'B' : 'A';
+    const hasBids = Object.keys(rs.teamBids).length > 0;
 
-    // CASE 3: Bids exist, only non-bidders remain active → last bidder wins
-    if (hasBids) {
-      const lastBidder = this._getLastBidder();
-      if (lastBidder) {
-        const activeBesideLastBidder = activePlayers.filter(p => p.id !== lastBidder);
-        if (activeBesideLastBidder.length === 0) {
-          console.log('[passBid] Only last bidder remains:', lastBidder);
-          return this._endBidding(lastBidder);
+    if (!hasBids) {
+      // No bids at all yet
+      const oppPlayers = this.players.filter(p => p.team === oppTeam);
+      const oppBothPassed = oppPlayers.every(p => rs.teamPassVotes[oppTeam]?.has(p.id));
+
+      if (oppBothPassed) {
+        // Both teams passed with no bids → check game context
+        if (rs.winningTeamBidFirst) {
+          // Forced: winning team gets trump at 21 + blind option
+          rs.phase = PHASE.TRUMP_SELECTION;
+          rs.winnerTeam = rs.higherScoreTeam;
+          rs.trumpTeam = rs.higherScoreTeam;
+          rs.targetBid = 21;
+          rs.biddingComplete = true;
+          rs.forcedTrump = true;
+          rs.canDeclareBlind = true; // they get blind middle card option
+          rs.trumpPickerPlayerId = null;
+          rs.winnerPlayerId = null;
+          return this._getPublicState();
+        } else {
+          // Game 1 all pass → host forced
+          const host = this.players.find(p => p.position === 0);
+          rs.phase = PHASE.TRUMP_SELECTION;
+          rs.winnerPlayerId = host.id;
+          rs.winnerTeam = host.team;
+          rs.trumpPickerPlayerId = host.id;
+          rs.trumpTeam = host.team;
+          rs.targetBid = 21;
+          rs.biddingComplete = true;
+          rs.forcedTrump = true;
+          rs.currentBid = 21;
+          return this._getPublicState();
         }
       }
+
+      // This team passed, no bids, switch to opponent
+      rs.biddingTeam = oppTeam;
+      // If it's the winning team that passed first, losing team starts at 20
+      if (rs.winningTeamBidFirst && player.team === rs.higherScoreTeam) {
+        rs.currentBid = 20; // losing team max is 20
+      }
+      return this._getPublicState();
     }
 
-    // Otherwise: still players to go — advance turn
-    console.log('[passBid] advancing turn, active players:', activePlayers.map(p=>p.name));
-    return this._advanceBidTurn();
+    // hasBids: this team passed — opponent team that bid wins
+    return this._endBidding(this._getLastBidder());
+  }
+
+  // No longer needed but keep for compat
+  losingTeamResponse(playerId, wantsToBid) {
+    return this._getPublicState();
   }
 
   _advanceBidTurn() {
@@ -278,17 +295,16 @@ class GameEngine {
 
   _getLastBidder() {
     const rs = this.roundState;
-    // Find the player with the lowest bid (they win the auction)
-    // Include ALL bidders — even ones who later passed, since they still placed a valid bid
-    let lastBidderId = null;
+    // Find team with lowest bid, return a player from that team
+    let winnerTeam = null;
     let lowestBid = Infinity;
-    for (const [pid, bid] of Object.entries(rs.playerBids)) {
-      if (bid < lowestBid) {
-        lowestBid = bid;
-        lastBidderId = pid;
-      }
+    for (const [team, bid] of Object.entries(rs.teamBids)) {
+      if (bid < lowestBid) { lowestBid = bid; winnerTeam = team; }
     }
-    return lastBidderId;
+    if (!winnerTeam) return null;
+    // Return the player from that team who placed the bid
+    const bidder = Object.entries(rs.playerBids).find(([pid]) => this.playerMap[pid]?.team === winnerTeam);
+    return bidder ? bidder[0] : this.players.find(p => p.team === winnerTeam)?.id;
   }
 
   _endBidding(winnerPlayerId) {
@@ -377,15 +393,42 @@ class GameEngine {
     }
     rs.trumpPickerPlayerId = playerId;
 
-    const { blindCards, trumpCard, trumpSuit } = getBlindMiddleTrump(rs.remaining);
-    rs.blindCards = blindCards;
+    // Deal 3 cards to the blind picker — middle one is the reserved trump
+    const remaining = [...rs.remaining];
+    const pickerCards = remaining.splice(0, 3); // first 3 go to picker
+    const trumpCard = pickerCards[1]; // middle card = blind trump
+
+    // Give picker all 3 cards first (they'll have 4+3=7), then reserve middle as trump
+    rs.hands[playerId] = [...(rs.hands[playerId] || []), ...pickerCards];
+    // Remove the trump card from picker's hand and store as reserved
+    rs.hands[playerId] = rs.hands[playerId].filter(c => c.id !== trumpCard.id);
+    rs.reservedTrumpCard = { playerId, card: trumpCard };
+
+    // Deal 3 cards to everyone else from remaining
+    const otherPlayers = this.players.filter(p => p.id !== playerId).map(p => p.id);
+    let idx = 0;
+    for (let round = 0; round < 3; round++) {
+      for (const pid of otherPlayers) {
+        rs.hands[pid] = [...(rs.hands[pid] || []), remaining[idx++]];
+      }
+    }
+    rs.remaining = remaining.slice(idx);
+
     rs.blindTrumpCard = trumpCard;
-    rs.trumpSuit = trumpSuit;
+    rs.trumpSuit = trumpCard.suit;
     rs.trumpType = 'BLIND';
     rs.trumpRevealed = false;
-    rs.hands = dealNextThree(rs.remaining, rs.hands, this.players.map(p => p.id));
     rs.phase = PHASE.PLAYING;
     rs.currentTurnPlayerId = this._getFirstLeader(playerId);
+
+    // Rule B: check opponent has trump
+    const opponentTeamPlayers = this.players.filter(p => p.team !== player.team);
+    const opponentHasTrump = opponentTeamPlayers.some(p =>
+      (rs.hands[p.id] || []).some(c => c.suit === rs.trumpSuit)
+    );
+    if (!opponentHasTrump) {
+      return this._endRoundDraw('Opponent team has no trump cards');
+    }
 
     return this._getPublicState();
   }
@@ -454,23 +497,13 @@ class GameEngine {
         if (hasLeadSuit && card.suit !== rs.leadSuit) {
           return this._error(`Must follow lead suit: ${rs.leadSuit}`);
         }
-        // ── Reserved trump rule: if picker has no lead suit AND reserved trump exists,
-        //    they MUST play the reserved trump card, not any other trump card ──
-        const reserved = rs.reservedTrumpCard;
-        if (!hasLeadSuit && reserved && reserved.playerId === playerId) {
-          return this._error('You must play your reserved trump card');
-        }
+        // Trump picker is FREE to play any card — no forced trump rule
       }
     }
 
-    // ── mustPlayTrump: player who showed trump must play a trump card ──
-    // Exception: if they have no trump cards at all, they can play anything
+    // mustPlayTrump (show trump button) — no enforcement, just clear the flag
     if (rs.mustPlayTrump === playerId) {
-      const hasTrump = hand.some(c => c.suit === rs.trumpSuit);
-      if (hasTrump && card.suit !== rs.trumpSuit) {
-        return this._error('You showed trump — you must play a trump card');
-      }
-      rs.mustPlayTrump = null; // clear after this play
+      rs.mustPlayTrump = null;
     }
 
     // ── Remove card from wherever it was ──
@@ -613,6 +646,22 @@ class GameEngine {
 
     rs.trumpRevealed = true; // reveal trump at round end
 
+    // ── Calculate per-player points for MVP ──
+    const playerPoints = {};
+    this.players.forEach(p => { playerPoints[p.id] = 0; });
+    [...rs.completedTricks.A, ...rs.completedTricks.B].forEach(trick => {
+      const pts = trick.cards.reduce((s, c) => s + c.card.points, 0);
+      if (playerPoints[trick.winner] !== undefined) {
+        playerPoints[trick.winner] += pts;
+      }
+    });
+    let mvpId = null, mvpPts = -1;
+    Object.entries(playerPoints).forEach(([pid, pts]) => {
+      if (pts > mvpPts) { mvpPts = pts; mvpId = pid; }
+    });
+    const mvpPlayer = this.players.find(p => p.id === mvpId);
+    const mvp = mvpPlayer ? { name: mvpPlayer.name, points: mvpPts, team: mvpPlayer.team } : null;
+
     rs.roundResult = {
       roundPoints: rs.roundPoints,
       target,
@@ -626,6 +675,7 @@ class GameEngine {
       matchOver: rs.phase === PHASE.MATCH_OVER,
       matchWinner: rs.phase === PHASE.MATCH_OVER
         ? (this.matchScore.A >= 12 ? 'A' : 'B') : null,
+      mvp,
     };
 
     return { ...this._getPublicState(), roundResult: rs.roundResult };
@@ -708,6 +758,12 @@ class GameEngine {
 
       bidding: {
         currentBid: rs.currentBid,
+        teamBids: { ...rs.teamBids },
+        biddingTeam: rs.biddingTeam || 'A',
+        teamPassVotes: {
+          A: [...(rs.teamPassVotes?.A || [])],
+          B: [...(rs.teamPassVotes?.B || [])],
+        },
         playerBids: { ...rs.playerBids },
         passedPlayers: [...(rs.passedPlayers || [])],
         currentBidderPlayerId: currentBidder?.id || null,
@@ -716,7 +772,10 @@ class GameEngine {
         winnerTeam: rs.winnerTeam,
         targetBid: rs.targetBid,
         forcedTrump: rs.forcedTrump || false,
-        isFirstBid: Object.keys(rs.playerBids || {}).length === 0,
+        isFirstBid: Object.keys(rs.teamBids || {}).length === 0,
+        winningTeamBidFirst: rs.winningTeamBidFirst || false,
+        losingTeam: rs.losingTeam || null,
+        higherScoreTeam: rs.higherScoreTeam || null,
       },
 
       trump: {
@@ -745,10 +804,9 @@ class GameEngine {
       mustPlayTrump: rs.mustPlayTrump || null,
 
       john: {
-        // Rule A — bidding John
         biddingJohnActive: rs.johnActive || false,
         biddingJohnPlayerId: rs.johnPlayerId || null,
-        // Rule B — mid-game John (rebuild deciders from current players)
+        biddingJohnTeam: rs.johnTeam || null,
         midgameJohnTeam: rs.midgameJohnTeam || null,
         midgameJohn: rs.midgameJohn || false,
         midgameJohnResponses: rs.midgameJohnResponses || {},

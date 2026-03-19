@@ -5,7 +5,7 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
   const {
     roundPoints, target, trumpTeam, opponentTeam,
     roundWinner, matchPointsAwarded, matchScore,
-    isDraw, drawReason,
+    isDraw, drawReason, mvp,
   } = result;
 
   // Helper: get "Name1 & Name2" for a team
@@ -37,6 +37,21 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
     </div>
   );
 
+  const MvpBadge = () => mvp ? (
+    <div style={{
+      background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)',
+      borderRadius: 14, padding: '14px 20px', marginBottom: 16, textAlign: 'center',
+    }}>
+      <div style={{ color: '#d4af37', fontSize: 11, letterSpacing: 2, marginBottom: 6, textTransform: 'uppercase' }}>⭐ MVP of the Round</div>
+      <div style={{ fontSize: 22, fontWeight: 'bold', color: mvp.team === 'A' ? '#3498db' : '#e74c3c' }}>
+        {mvp.name}
+      </div>
+      <div style={{ color: '#8fa8c8', fontSize: 13, marginTop: 4 }}>
+        {mvp.points} points earned this round
+      </div>
+    </div>
+  ) : null;
+
   // ── DRAW ──
   if (isDraw) {
     return (
@@ -55,6 +70,7 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
             <MatchPill label={teamBNames} score={matchScore.B} color="#e74c3c" />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <MvpBadge />
             <NextButton />
           </div>
         </div>
@@ -106,6 +122,7 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+          <MvpBadge />
           <NextButton />
         </div>
       </div>
