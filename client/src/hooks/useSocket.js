@@ -29,7 +29,14 @@ export function useSocket() {
   useEffect(() => {
     let socket;
     import('socket.io-client').then(({ io }) => {
-      socket = io(SERVER_URL, { reconnectionAttempts: 5, timeout: 10000 });
+      socket = io(SERVER_URL, {
+        reconnectionAttempts: 10,
+        timeout: 20000,
+        // Use polling first then upgrade — works on Jio and all networks
+        transports: ['polling', 'websocket'],
+        upgrade: true,
+        rememberUpgrade: false,
+      });
       socketRef.current = socket;
 
       socket.on('connect', () => {
@@ -146,11 +153,11 @@ export function useSocket() {
   };
   const clearSession = () => { try { localStorage.removeItem('28trump_session'); } catch(e) {} };
 
-  const createRoom = useCallback((n) => emit('create_room', { playerName: n }).then(r => {
+  const createRoom = useCallback((n, userId) => emit('create_room', { playerName: n, userId }).then(r => {
     if (r?.success) { setRoomId(r.roomId); saveSession(r.persistentId, r.roomId, n); }
     return r;
   }), [emit]);
-  const joinRoom = useCallback((id, n) => emit('join_room', { roomId: id, playerName: n }).then(r => {
+  const joinRoom = useCallback((id, n, userId) => emit('join_room', { roomId: id, playerName: n, userId }).then(r => {
     if (r?.success) { setRoomId(r.roomId); saveSession(r.persistentId, r.roomId, n); }
     return r;
   }), [emit]);

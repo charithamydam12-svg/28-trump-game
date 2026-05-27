@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
 import { useSocket } from './hooks/useSocket';
+import { auth, api } from './api';
 import HomeScreen from './screens/HomeScreen';
 import LobbyScreen from './screens/LobbyScreen';
 import BiddingScreen from './screens/BiddingScreen';
 import GameTable from './screens/GameTable';
 import RoundResultScreen from './screens/RoundResultScreen';
 import MatchOverScreen from './screens/MatchOverScreen';
+import AuthScreen from './screens/AuthScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import LeaderboardScreen from './screens/LeaderboardScreen';
 
 class ErrorBoundary extends Component {
   state = { error: null };
@@ -42,7 +46,30 @@ const BIDDING_PHASES = ['BIDDING', 'ASK_LOSING_TEAM', 'TRUMP_SELECTION', 'JOHN_O
 function GameApp() {
   const socket = useSocket();
   const hasSession = (() => { try { return !!localStorage.getItem('28trump_session'); } catch (e) { return false; } })();
-  const [screen, setScreen] = useState(hasSession ? 'RECONNECTING' : 'HOME');
+  const [user, setUser] = useState(auth.getUser());
+  const initialScreen = !auth.isLoggedIn() ? 'AUTH' : (hasSession ? 'RECONNECTING' : 'HOME');
+  const [screen, setScreen] = useState(initialScreen);
+
+  // Refresh user data on load to get latest stats
+  useEffect(() => {
+    if (!auth.isLoggedIn()) return;
+    api.me().then(({ user }) => {
+      auth.updateUser(user);
+      setUser(user);
+    }).catch(() => {
+      // Token invalid → log out
+      auth.logout();
+      setUser(null);
+      setScreen('AUTH');
+    });
+  }, []);
+
+  const handleLogout = () => {
+    auth.logout();
+    setUser(null);
+    setScreen('AUTH');
+  };
+
   // If reconnecting but no state arrives in 6s → go home (session kept, can retry)
   useEffect(() => {
     if (screen !== 'RECONNECTING') return;
@@ -95,11 +122,11 @@ function GameApp() {
   }, [gs?.gameNumber]);
 
   const handleCreateRoom = async (name) => {
-    const res = await socket.createRoom(name);
+    const res = await socket.createRoom(name, user?.id);
     if (res?.success) setScreen('LOBBY');
   };
   const handleJoinRoom = async (roomId, name) => {
-    const res = await socket.joinRoom(roomId, name);
+    const res = await socket.joinRoom(roomId, name, user?.id);
     if (res?.success) setScreen('LOBBY');
   };
   const handleStartGame = async () => {
@@ -284,7 +311,26 @@ function GameApp() {
           ⚠️ {socket.error}
         </div>
       )}
-      {screen === 'HOME' && <HomeScreen onCreateRoom={handleCreateRoom} onJoinRoom={handleJoinRoom} />}
+      {screen === 'AUTH' && (
+        <AuthScreen onLoggedIn={(u) => { setUser(u); setScreen('HOME'); }} />
+      )}
+      {screen === 'PROFILE' && user && (
+        <ProfileScreen user={user} onUpdate={setUser}
+          onBack={() => setScreen('HOME')} onLogout={handleLogout} />
+      )}
+      {screen === 'LEADERBOARD' && (
+        <LeaderboardScreen currentUserId={user?.id} onBack={() => setScreen('HOME')} />
+      )}
+      {screen === 'HOME' && (
+        <HomeScreen
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
+          user={user}
+          onProfile={() => setScreen('PROFILE')}
+          onLeaderboard={() => setScreen('LEADERBOARD')}
+          onLogout={handleLogout}
+        />
+      )}
       {screen === 'RECONNECTING' && (
         <div style={{
           minHeight: '100vh', display: 'flex', flexDirection: 'column',

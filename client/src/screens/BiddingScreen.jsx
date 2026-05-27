@@ -54,16 +54,30 @@ export default function BiddingScreen({
       {gs.phase === 'BIDDING' && (
         <PhaseBox title="Bidding Phase">
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <div style={{ color: '#6b8aaa', fontSize: 13, marginBottom: 4 }}>Current Highest Bid</div>
-            <div style={{ fontSize: 52, fontWeight: 'bold', color: johnActive ? '#f39c12' : GOLD, lineHeight: 1 }}>
-              {bid.currentBid}
-              {johnActive && <span style={{ fontSize: 18, marginLeft: 8 }}>🃏</span>}
-            </div>
-            {johnActive && (
-              <div style={{ color: '#f39c12', fontSize: 12, marginTop: 4 }}>
-                John by {gs.players.find(p => p.id === gs.john.biddingJohnPlayerId)?.name}
-              </div>
-            )}
+            {(() => {
+              const lastBidderId = bid.lastBidderPlayerId;
+              const lastBidderName = lastBidderId
+                ? gs.players.find(p => p.id === lastBidderId)?.name
+                : null;
+              return (
+                <>
+                  <div style={{ color: '#6b8aaa', fontSize: 13, marginBottom: 4 }}>
+                    {lastBidderName
+                      ? <>Current Highest Bid by <b style={{ color: GOLD }}>{lastBidderName}</b></>
+                      : 'Current Highest Bid'}
+                  </div>
+                  <div style={{ fontSize: 52, fontWeight: 'bold', color: johnActive ? '#f39c12' : GOLD, lineHeight: 1 }}>
+                    {bid.currentBid}
+                    {johnActive && <span style={{ fontSize: 18, marginLeft: 8 }}>🃏</span>}
+                  </div>
+                  {johnActive && (
+                    <div style={{ color: '#f39c12', fontSize: 12, marginTop: 4 }}>
+                      John by {gs.players.find(p => p.id === gs.john.biddingJohnPlayerId)?.name}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 20 }}>

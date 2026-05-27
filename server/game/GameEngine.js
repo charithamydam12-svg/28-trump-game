@@ -150,7 +150,8 @@ class GameEngine {
     }
 
     rs.teamBids[player.team] = bidValue;
-    rs.playerBids[playerId] = bidValue; // legacy compat
+    rs.playerBids[playerId] = bidValue;
+    rs.lastBidderPlayerId = playerId;
     rs.currentBid = bidValue;
 
     // Cancel John if opponent bids <= 15
@@ -187,6 +188,7 @@ class GameEngine {
     rs.johnActive = true;
     rs.teamBids[player.team] = JOHN_BID;
     rs.playerBids[playerId] = JOHN_BID;
+    rs.lastBidderPlayerId = playerId;
     rs.currentBid = JOHN_BID;
 
     // Switch to opponent's turn
@@ -295,16 +297,29 @@ class GameEngine {
 
   _getLastBidder() {
     const rs = this.roundState;
-    // Find team with lowest bid, return a player from that team
+    // Find team with lowest bid
     let winnerTeam = null;
     let lowestBid = Infinity;
     for (const [team, bid] of Object.entries(rs.teamBids)) {
       if (bid < lowestBid) { lowestBid = bid; winnerTeam = team; }
     }
     if (!winnerTeam) return null;
-    // Return the player from that team who placed the bid
-    const bidder = Object.entries(rs.playerBids).find(([pid]) => this.playerMap[pid]?.team === winnerTeam);
-    return bidder ? bidder[0] : this.players.find(p => p.team === winnerTeam)?.id;
+
+    // If last bidder is on the winning team and matches the winning bid, use them
+    if (rs.lastBidderPlayerId) {
+      const lastBidder = this.playerMap[rs.lastBidderPlayerId];
+      if (lastBidder?.team === winnerTeam && rs.playerBids[rs.lastBidderPlayerId] === lowestBid) {
+        return rs.lastBidderPlayerId;
+      }
+    }
+
+    // Fallback: find any player from that team with matching bid
+    for (const [pid, bid] of Object.entries(rs.playerBids)) {
+      if (this.playerMap[pid]?.team === winnerTeam && bid === lowestBid) {
+        return pid;
+      }
+    }
+    return this.players.find(p => p.team === winnerTeam)?.id;
   }
 
   _endBidding(winnerPlayerId) {
@@ -765,6 +780,7 @@ class GameEngine {
           B: [...(rs.teamPassVotes?.B || [])],
         },
         playerBids: { ...rs.playerBids },
+        lastBidderPlayerId: rs.lastBidderPlayerId || null,
         passedPlayers: [...(rs.passedPlayers || [])],
         currentBidderPlayerId: currentBidder?.id || null,
         biddingComplete: rs.biddingComplete,

@@ -4,9 +4,9 @@ const GOLD = '#d4af37';
 const DARK = '#0a1628';
 const GREEN = '#1a4731';
 
-export default function HomeScreen({ onCreateRoom, onJoinRoom }) {
+export default function HomeScreen({ onCreateRoom, onJoinRoom, user, onProfile, onLeaderboard, onLogout }) {
   const [mode, setMode] = useState(null); // 'create' | 'join'
-  const [name, setName] = useState('');
+  const [name, setName] = useState(user?.name || '');
   const [roomCode, setRoomCode] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +16,7 @@ export default function HomeScreen({ onCreateRoom, onJoinRoom }) {
     if (mode === 'create') {
       await onCreateRoom(name.trim());
     } else {
-      await onJoinRoom(roomCode.trim().toUpperCase(), name.trim());
+      await onJoinRoom(roomCode.trim(), name.trim());
     }
     setLoading(false);
   };
@@ -28,6 +28,29 @@ export default function HomeScreen({ onCreateRoom, onJoinRoom }) {
       background: `radial-gradient(ellipse at center, #0d2137 0%, #0a1628 70%)`,
       padding: 24,
     }}>
+      {/* User header */}
+      {user && (
+        <div style={{ position: 'fixed', top: 12, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', zIndex: 100 }}>
+          <button onClick={onProfile} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'rgba(255,255,255,0.06)', border: `1px solid rgba(212,175,55,0.3)`,
+            borderRadius: 30, padding: '6px 14px 6px 6px', cursor: 'pointer',
+          }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: GOLD, color: '#0a1628', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14 }}>
+              {(user.name || '?')[0].toUpperCase()}
+            </div>
+            <div style={{ color: GOLD, fontSize: 13, fontWeight: 'bold' }}>{user.name}</div>
+          </button>
+          <button onClick={onLeaderboard} style={{
+            background: 'rgba(255,255,255,0.06)', border: `1px solid rgba(212,175,55,0.3)`,
+            borderRadius: 8, padding: '8px 14px', cursor: 'pointer',
+            color: GOLD, fontSize: 13, fontWeight: 'bold',
+          }}>
+            🏆 Leaderboard
+          </button>
+        </div>
+      )}
+
       {/* Background felt texture */}
       <div style={{
         position: 'fixed', inset: 0, opacity: 0.04,
@@ -117,12 +140,13 @@ export default function HomeScreen({ onCreateRoom, onJoinRoom }) {
             <>
               <label style={{ ...labelStyle, marginTop: 16 }}>Room Code</label>
               <input
-                style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: 6, textAlign: 'center' }}
-                placeholder="ABC123"
+                style={{ ...inputStyle, letterSpacing: 6, textAlign: 'center', fontSize: 24 }}
+                placeholder="1234"
                 value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                maxLength={6}
+                maxLength={4}
+                inputMode="numeric"
               />
             </>
           )}

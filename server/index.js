@@ -1,6 +1,6 @@
 // ============================================================
 // MAIN SERVER — 28 Card Trump Game
-// Express + Socket.io
+// Express + Socket.io + Auth
 // ============================================================
 
 const express = require('express');
@@ -8,8 +8,11 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const Room = require('./game/Room');
+const db = require('./db');
+const auth = require('./auth');
 
 const app = express();
+app.use(express.json());
 const httpServer = createServer(app);
 
 const PORT = process.env.PORT || 3001;
@@ -20,9 +23,11 @@ const io = new Server(httpServer, {
     origin: '*',
     methods: ['GET', 'POST'],
   },
-  transports: ['websocket', 'polling'],
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  transports: ['polling', 'websocket'],
+  pingTimeout: 120000,
+  pingInterval: 30000,
+  upgradeTimeout: 30000,
+  allowUpgrades: true,
 });
 
 // Also set CORS headers on express for polling fallback
@@ -74,6 +79,113 @@ function emitLobby(roomId) {
   io.to(roomId).emit('lobby_state', room.getLobbyState());
 }
 
+// ─── STAT TRACKING ──────────────────────────────
+async function trackGameStarted(room) {
+  // Increment games_played for all logged-in players
+  for (const p of room.players) {
+    if (p.userId) {
+      try { await db.incrementStat(p.userId, 'games_played'); } catch(e) { console.error('stat error:', e.message); }
+    }
+  }
+}
+
+async function trackRoundEnd(room, roundResult) {
+  if (!roundResult) return;
+  try {
+    // MVP
+    if (roundResult.mvp) {
+      const mvpPlayer = room.players.find(p => p.name === roundResult.mvp.name && p.team === roundResult.mvp.team);
+      if (mvpPlayer?.userId) await db.incrementStat(mvpPlayer.userId, 'mvp_count');
+    }
+    // Match win (round won by team)
+    if (roundResult.roundWinner) {
+      const winners = room.players.filter(p => p.team === roundResult.roundWinner && p.userId);
+      for (const p of winners) await db.incrementStat(p.userId, 'games_won');
+    }
+    // Series win (matchOver = first to 12)
+    if (roundResult.matchOver && roundResult.matchWinner) {
+      const seriesWinners = room.players.filter(p => p.team === roundResult.matchWinner && p.userId);
+      for (const p of seriesWinners) await db.incrementStat(p.userId, 'series_won');
+    }
+  } catch(e) { console.error('round stat error:', e.message); }
+}
+
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// AUTH ROUTES (REST)
+// ─────────────────────────────────────────────
+app.post('/api/signup', async (req, res) => {
+  try {
+    const { name, username, mobile, password } = req.body;
+    if (!name || !username || !mobile || !password) {
+      return res.status(400).json({ error: 'All fields required' });
+    }
+    if (password.length < 4) return res.status(400).json({ error: 'Password too short (min 4 chars)' });
+    if (username.length < 3) return res.status(400).json({ error: 'Username too short (min 3 chars)' });
+    if (!/^\d{6,15}$/.test(mobile)) return res.status(400).json({ error: 'Invalid mobile number' });
+
+    const passwordHash = await auth.hashPassword(password);
+    const user = await db.createUser({ name, username, mobile, passwordHash });
+    const token = auth.generateToken(user.id);
+    res.json({ token, user });
+  } catch (err) {
+    if (err.code === '23505') {
+      const which = err.detail?.includes('username') ? 'Username' : 'Mobile';
+      return res.status(409).json({ error: `${which} already exists` });
+    }
+    console.error('signup error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  try {
+    const { login, password } = req.body;
+    if (!login || !password) return res.status(400).json({ error: 'Login & password required' });
+    const user = await db.findUserByLogin(login);
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    const ok = await auth.verifyPassword(password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+    const token = auth.generateToken(user.id);
+    delete user.password_hash;
+    res.json({ token, user });
+  } catch (err) {
+    console.error('login error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/me', auth.authMiddleware, async (req, res) => {
+  const user = await db.findUserById(req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ user });
+});
+
+app.put('/api/profile', auth.authMiddleware, async (req, res) => {
+  try {
+    const { name, username, mobile, password } = req.body;
+    const updates = { name, username, mobile };
+    if (password) updates.passwordHash = await auth.hashPassword(password);
+    const user = await db.updateUser(req.userId, updates);
+    res.json({ user });
+  } catch (err) {
+    if (err.code === '23505') {
+      const which = err.detail?.includes('username') ? 'Username' : 'Mobile';
+      return res.status(409).json({ error: `${which} already in use` });
+    }
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const players = await db.getLeaderboard(50);
+    res.json({ players });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ─────────────────────────────────────────────
 // SOCKET.IO EVENTS
 // ─────────────────────────────────────────────
@@ -81,9 +193,9 @@ io.on('connection', (socket) => {
   console.log(`✅ Connected: ${socket.id}`);
 
   // ── CREATE ROOM ──────────────────────────────
-  socket.on('create_room', ({ playerName }, callback) => {
+  socket.on('create_room', ({ playerName, userId }, callback) => {
     try {
-      const room = new Room(socket.id, playerName);
+      const room = new Room(socket.id, playerName, userId);
       room.players[0].socketId = socket.id;
 
       rooms.set(room.roomId, room);
@@ -145,13 +257,13 @@ io.on('connection', (socket) => {
   });
 
   // ── JOIN ROOM ─────────────────────────────────
-  socket.on('join_room', ({ roomId, playerName }, callback) => {
+  socket.on('join_room', ({ roomId, playerName, userId }, callback) => {
     try {
       const room = getRoom(roomId.trim());
       if (!room) return callback({ error: 'Room not found' });
       if (room.status === 'PLAYING') return callback({ error: 'Game already started' });
 
-      const result = room.addPlayer(socket.id, playerName);
+      const result = room.addPlayer(socket.id, playerName, userId);
       if (result.error) return callback(result);
 
       result.player.socketId = socket.id;
@@ -190,8 +302,10 @@ io.on('connection', (socket) => {
     if (result.error) return callback(result);
 
     console.log(`🎮 Game started in room ${roomId}`);
+    trackGameStarted(room); // track stats
     callback({ success: true });
     const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+    if (result.roundResult) trackRoundEnd(room, result.roundResult);
     emitGameState(roomId, extra);
   });
 
@@ -288,6 +402,7 @@ io.on('connection', (socket) => {
       trumpTeam: result.trump?.trumpTeam,
     });
     const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+    if (result.roundResult) trackRoundEnd(room, result.roundResult);
     emitGameState(roomId, extra);
   });
 
@@ -306,6 +421,7 @@ io.on('connection', (socket) => {
       message: 'Blind trump declared! Trump suit hidden until first trump played.',
     });
     const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+    if (result.roundResult) trackRoundEnd(room, result.roundResult);
     emitGameState(roomId, extra);
   });
 
@@ -346,6 +462,7 @@ io.on('connection', (socket) => {
         const advResult = advRoom.advanceTrick();
         if (!advResult) return;
         const extra = advResult.roundResult ? { roundResult: advResult.roundResult } : {};
+        if (advResult.roundResult) trackRoundEnd(advRoom, advResult.roundResult);
         emitGameState(roomId, extra);
       }, 5000); // 5s trick display delay
     } else {
@@ -410,6 +527,7 @@ io.on('connection', (socket) => {
 
     callback({ success: true });
     const extra = result.roundResult ? { roundResult: result.roundResult } : {};
+    if (result.roundResult) trackRoundEnd(room, result.roundResult);
     emitGameState(roomId, extra);
   });
 
@@ -538,7 +656,8 @@ app.get('/health', (req, res) => {
 // ─────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 28 Trump Game Server running on port ${PORT}`);
   console.log(`📡 Socket.io ready`);
+  await db.initDatabase();
 });

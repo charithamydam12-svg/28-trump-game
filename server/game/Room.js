@@ -7,7 +7,7 @@ const { randomUUID } = require('crypto');
 const { GameEngine } = require('./GameEngine');
 
 class Room {
-  constructor(hostId, hostName) {
+  constructor(hostId, hostName, hostUserId) {
     this.roomId = this._generateCode();
     this.hostId = hostId;
     this.players = []; // max 4
@@ -15,13 +15,13 @@ class Room {
     this.engine = null;
     this.createdAt = Date.now();
 
-    this.addPlayer(hostId, hostName);
+    this.addPlayer(hostId, hostName, hostUserId);
   }
 
   // ─────────────────────────────────────────────
   // PLAYER MANAGEMENT
   // ─────────────────────────────────────────────
-  addPlayer(playerId, playerName) {
+  addPlayer(playerId, playerName, userId = null) {
     if (this.players.length >= 4) {
       return { error: 'Room is full (max 4 players)' };
     }
@@ -30,12 +30,12 @@ class Room {
     }
 
     const position = this.players.length;
-    // Auto-assign teams: positions 0,2 = Team A, positions 1,3 = Team B
     const team = position % 2 === 0 ? 'A' : 'B';
 
     this.players.push({
-      id: playerId,          // current socket.id — changes on reconnect
-      persistentId: randomUUID(), // stable across reconnects — saved in client localStorage
+      id: playerId,
+      persistentId: randomUUID(),
+      userId,                    // DB user id — null if guest
       name: playerName,
       team,
       position,
