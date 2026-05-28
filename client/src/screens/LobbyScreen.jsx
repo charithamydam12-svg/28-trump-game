@@ -19,7 +19,7 @@ export default function LobbyScreen({ lobby, playerId, onSwapTeam, onStartGame, 
       padding: 24,
     }}>
       {/* Top-right exit buttons */}
-      <div style={{ position: 'fixed', top: 52, right: 12, display: 'flex', gap: 8, zIndex: 999 }}>
+      <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 12, display: 'flex', gap: 8, zIndex: 999 }}>
         {isHost && (
           <button onClick={onEndGame} style={topBtn('#c0392b')}>✕ End Game</button>
         )}

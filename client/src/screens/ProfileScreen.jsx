@@ -45,7 +45,7 @@ export default function ProfileScreen({ user: initialUser, onUpdate, onBack, onL
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at center, #0d2137 0%, #0a1628 70%)', padding: 24 }}>
+    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at center, #0d2137 0%, #0a1628 70%)', padding: 'calc(env(safe-area-inset-top, 0px) + 24px) 24px 24px' }}>
       <div style={{ maxWidth: 480, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <button onClick={onBack} style={backBtn}>← Back</button>

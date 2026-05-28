@@ -30,7 +30,7 @@ export default function HomeScreen({ onCreateRoom, onJoinRoom, user, onProfile, 
     }}>
       {/* User header */}
       {user && (
-        <div style={{ position: 'fixed', top: 12, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', zIndex: 100 }}>
+        <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', zIndex: 100 }}>
           <button onClick={onProfile} style={{
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'rgba(255,255,255,0.06)', border: `1px solid rgba(212,175,55,0.3)`,

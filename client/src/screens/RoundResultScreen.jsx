@@ -21,7 +21,7 @@ export default function RoundResultScreen({ result, players, isHost, onNextRound
   const winnerNames = roundWinner ? teamNames(roundWinner) : '';
 
   const ExitButtons = () => (
-    <div style={{ position: 'fixed', top: 52, right: 12, display: 'flex', gap: 8, zIndex: 999 }}>
+    <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 12, display: 'flex', gap: 8, zIndex: 999 }}>
       {isHost && (
         <button onClick={onEndGame} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#c0392b', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 'bold' }}>✕ End Game</button>
       )}

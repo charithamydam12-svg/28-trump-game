@@ -234,7 +234,7 @@ function GameApp() {
     <div style={{ minHeight: '100vh', background: '#0a1628', fontFamily: 'Georgia, serif' }}>
       {/* Global connection dot — top left, small, unobtrusive */}
       <div style={{
-        position: 'fixed', top: 10, left: 12, zIndex: 9999,
+        position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 8px)', left: 12, zIndex: 9999,
         width: 10, height: 10, borderRadius: '50%',
         background: socket.connected ? '#27ae60' : '#e74c3c',
         boxShadow: socket.connected ? '0 0 8px #27ae60' : '0 0 8px #e74c3c',

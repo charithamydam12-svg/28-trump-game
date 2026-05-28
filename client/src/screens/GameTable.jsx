@@ -71,7 +71,7 @@ export default function GameTable({ gameState, myHand, playerId, onPlayCard, onR
       {/* ── TOP BAR ── */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '12px 24px',
+        padding: 'calc(env(safe-area-inset-top, 0px) + 12px) 24px 12px',
         background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <ScorePill team="A" score={gs.matchScore.A} color="#3498db" />
