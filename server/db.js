@@ -4,35 +4,60 @@
 
 const { Pool } = require('pg');
 
+// Railway internal connections don't need SSL; external ones do.
+// Enabling SSL with rejectUnauthorized:false works for both on Railway.
+const useSSL = !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
 });
 
+pool.on('error', (err) => {
+  console.error('❌ Unexpected PG pool error:', err.message);
+});
+
+const CREATE_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    mobile VARCHAR(15) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    games_played INTEGER DEFAULT 0,
+    games_won INTEGER DEFAULT 0,
+    mvp_count INTEGER DEFAULT 0,
+    series_won INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+`;
+
+let tableReady = false;
+
 async function initDatabase() {
+  if (!process.env.DATABASE_URL) {
+    console.error('❌ DATABASE_URL not set — skipping DB init');
+    return;
+  }
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        mobile VARCHAR(15) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        games_played INTEGER DEFAULT 0,
-        games_won INTEGER DEFAULT 0,
-        mvp_count INTEGER DEFAULT 0,
-        series_won INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-    console.log('✅ Database initialized');
+    await pool.query(CREATE_TABLE_SQL);
+    tableReady = true;
+    console.log('✅ Database initialized (users table ready)');
   } catch (err) {
     console.error('❌ DB init error:', err.message);
   }
 }
 
+// Ensure the table exists before a query that needs it (lazy fallback)
+async function ensureTable() {
+  if (tableReady) return;
+  await pool.query(CREATE_TABLE_SQL);
+  tableReady = true;
+}
+
 // ── User functions ──
 async function createUser({ name, username, mobile, passwordHash }) {
+  await ensureTable();
   const result = await pool.query(
     `INSERT INTO users (name, username, mobile, password_hash)
      VALUES ($1, $2, $3, $4)
@@ -43,6 +68,7 @@ async function createUser({ name, username, mobile, passwordHash }) {
 }
 
 async function findUserByLogin(login) {
+  await ensureTable();
   // login = username OR mobile
   const result = await pool.query(
     `SELECT * FROM users WHERE username = $1 OR mobile = $1 LIMIT 1`,
@@ -85,6 +111,7 @@ async function incrementStat(userId, stat, amount = 1) {
 }
 
 async function getLeaderboard(limit = 50) {
+  await ensureTable();
   const result = await pool.query(
     `SELECT id, name, username, games_played, games_won, mvp_count, series_won
      FROM users
@@ -96,7 +123,7 @@ async function getLeaderboard(limit = 50) {
 }
 
 module.exports = {
-  pool, initDatabase,
+  pool, initDatabase, ensureTable,
   createUser, findUserByLogin, findUserById, updateUser,
   incrementStat, getLeaderboard,
 };
