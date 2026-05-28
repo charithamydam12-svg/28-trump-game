@@ -1,5 +1,28 @@
+# Dependencies — never commit these
 node_modules/
+**/node_modules/
+server/node_modules/
+client/node_modules/
+
+# Environment
 .env
 .env.local
+**/.env
+**/.env.local
+
+# Build output
 dist/
+**/dist/
+client/dist/
+
+# Android build artifacts
+client/android/
+**/*.apk
+**/build/
+**/.gradle/
+
+# Misc
 .DS_Store
+*.log
+npm-debug.log*
+
