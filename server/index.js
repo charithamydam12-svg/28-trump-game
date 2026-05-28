@@ -3,6 +3,9 @@
 // Express + Socket.io + Auth
 // ============================================================
 
+// Load .env for local development (harmless in production — Railway sets env vars directly)
+try { require('dotenv').config(); } catch (e) { /* dotenv not installed in prod, that's fine */ }
+
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
@@ -33,12 +36,13 @@ const io = new Server(httpServer, {
 // Also set CORS headers on express for polling fallback
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
-app.use(cors());
+app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization'] }));
 app.use(express.json());
 
 // ─────────────────────────────────────────────
@@ -134,7 +138,11 @@ app.post('/api/signup', async (req, res) => {
       return res.status(409).json({ error: `${which} already exists` });
     }
     console.error('signup error:', err);
-    res.status(500).json({ error: 'Server error' });
+    // Surface DB connection issues clearly
+    if (!process.env.DATABASE_URL) {
+      return res.status(500).json({ error: 'Database not configured (DATABASE_URL missing)' });
+    }
+    res.status(500).json({ error: `Server error: ${err.message}` });
   }
 });
 
