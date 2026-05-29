@@ -92,24 +92,24 @@ function emitLobby(roomId) {
 }
 
 // ─── STAT TRACKING ──────────────────────────────
-async function trackGameStarted(room) {
-  // Increment games_played for all logged-in players
-  for (const p of room.players) {
-    if (p.userId) {
-      try { await db.incrementStat(p.userId, 'games_played'); } catch(e) { console.error('stat error:', e.message); }
-    }
-  }
-}
+// NOTE: games_played is incremented per ROUND (not per match-series start)
+// so it matches games_won meaningfully.
 
 async function trackRoundEnd(room, roundResult) {
   if (!roundResult) return;
+  // Skip draws — neither team played a "real" winnable round
+  if (roundResult.isDraw) return;
   try {
+    // Increment games_played for ALL logged-in players in this round
+    for (const p of room.players) {
+      if (p.userId) await db.incrementStat(p.userId, 'games_played');
+    }
     // MVP
     if (roundResult.mvp) {
       const mvpPlayer = room.players.find(p => p.name === roundResult.mvp.name && p.team === roundResult.mvp.team);
       if (mvpPlayer?.userId) await db.incrementStat(mvpPlayer.userId, 'mvp_count');
     }
-    // Match win (round won by team)
+    // Round win
     if (roundResult.roundWinner) {
       const winners = room.players.filter(p => p.team === roundResult.roundWinner && p.userId);
       for (const p of winners) await db.incrementStat(p.userId, 'games_won');
@@ -318,7 +318,6 @@ io.on('connection', (socket) => {
     if (result.error) return callback(result);
 
     console.log(`🎮 Game started in room ${roomId}`);
-    trackGameStarted(room); // track stats
     callback({ success: true });
     const extra = result.roundResult ? { roundResult: result.roundResult } : {};
     if (result.roundResult) trackRoundEnd(room, result.roundResult);
