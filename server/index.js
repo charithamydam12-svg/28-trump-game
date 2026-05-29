@@ -6,6 +6,14 @@
 // Load .env for local development (harmless in production — Railway sets env vars directly)
 try { require('dotenv').config(); } catch (e) { /* dotenv not installed in prod, that's fine */ }
 
+// Prevent DB hiccups from crashing the server
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️  Unhandled Promise Rejection:', reason?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️  Uncaught Exception:', err.message);
+});
+
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');

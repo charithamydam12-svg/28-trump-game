@@ -11,10 +11,16 @@ const useSSL = !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes(
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: useSSL ? { rejectUnauthorized: false } : false,
+  // Resilience settings — survive DB restarts
+  connectionTimeoutMillis: 10000,   // 10s to connect
+  idleTimeoutMillis: 30000,         // close idle clients after 30s
+  max: 10,                          // max connections
+  allowExitOnIdle: false,           // keep pool alive
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Unexpected PG pool error:', err.message);
+  // Catch idle-client errors so they don't crash the process
+  console.error('⚠️  PG pool client error (recovering):', err.message);
 });
 
 const CREATE_TABLE_SQL = `
@@ -34,18 +40,25 @@ const CREATE_TABLE_SQL = `
 
 let tableReady = false;
 
-async function initDatabase() {
+async function initDatabase(retries = 5, delayMs = 3000) {
   if (!process.env.DATABASE_URL) {
     console.error('❌ DATABASE_URL not set — skipping DB init');
     return;
   }
-  try {
-    await pool.query(CREATE_TABLE_SQL);
-    tableReady = true;
-    console.log('✅ Database initialized (users table ready)');
-  } catch (err) {
-    console.error('❌ DB init error:', err.message);
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await pool.query(CREATE_TABLE_SQL);
+      tableReady = true;
+      console.log(`✅ Database initialized (users table ready) — attempt ${attempt}`);
+      return;
+    } catch (err) {
+      console.error(`❌ DB init attempt ${attempt}/${retries} failed:`, err.message);
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
   }
+  console.error('❌ DB init gave up — will retry on first user request');
 }
 
 // Ensure the table exists before a query that needs it (lazy fallback)
@@ -107,7 +120,12 @@ async function updateUser(id, { name, username, mobile, passwordHash }) {
 async function incrementStat(userId, stat, amount = 1) {
   const validStats = ['games_played', 'games_won', 'mvp_count', 'series_won'];
   if (!validStats.includes(stat)) return;
-  await pool.query(`UPDATE users SET ${stat} = ${stat} + $1 WHERE id = $2`, [amount, userId]);
+  try {
+    await pool.query(`UPDATE users SET ${stat} = ${stat} + $1 WHERE id = $2`, [amount, userId]);
+  } catch (err) {
+    console.error(`⚠️  incrementStat(${stat}) failed for user ${userId}: ${err.message}`);
+    // don't throw — stat updates are non-critical
+  }
 }
 
 async function getLeaderboard(limit = 50) {
